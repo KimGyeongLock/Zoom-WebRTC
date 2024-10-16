@@ -2,7 +2,7 @@
 const socket = io();
 
 const welcome = document.getElementById("welcome")
-const form = welcome.querySelector("form");
+const form = document.getElementById("roomSetting");
 const room = document.getElementById("room");
 
 room.hidden = true;
@@ -18,7 +18,7 @@ function addMessage(msg){
 
 function handleMessageSubmit(e) {
     e.preventDefault();
-    const input = room.querySelector("input");
+    const input = room.querySelector("#msg input");
     // 백엔드로 갈 new_message 이벤트 발생. input과 room 이름이 넘어가고 
     // ul아래 li로 추가될 You: ${입력값} 으로 나오는 function addMsg 동작
     const inputText = input.value;
@@ -29,18 +29,28 @@ function handleMessageSubmit(e) {
     input.value = "";
 }
 
+function handleNicknameSubmit(e) {
+    e.preventDefault();
+    const input = room.querySelector("#name input");
+    const inputText = input.value;
+    socket.emit("nickname", inputText);
+    input.value = "";
+}
+
 function showRoom(){
     welcome.hidden = true;
     room.hidden = false;
     const h3 = room.querySelector("h3");
     h3.innerText = `Room ${roomName}`;
-    const form = room.querySelector("form");
-    form.addEventListener("submit", handleMessageSubmit);
+    const msgForm = room.querySelector("#msg");
+    const nameForm = room.querySelector("#name");
+    msgForm.addEventListener("submit", handleMessageSubmit);
+    nameForm.addEventListener("submit", handleNicknameSubmit);
 }
 
 function handleRoomSubmit(e){
     e.preventDefault();
-    const input = form.querySelector("input");
+    const input = document.querySelector("input")
     // 아무 이벤트에 객체도 보낼 수 있음(전에는 String이어야만 함)
     // 3번째 인자에는 백에서 호출되고 프론트에서 실행됨
     // 백에서는 보안 문제로 절대 실행되지 않음.
@@ -51,20 +61,15 @@ function handleRoomSubmit(e){
 
 form.addEventListener("submit", handleRoomSubmit);
 
-socket.on("welcome", () => {
-    addMessage("Someone Joined");
+socket.on("welcome", (user) => {
+    addMessage(`${user} Joined`);
 });
 
-socket.on("bye", () => {
-    addMessage("Someone Left");
+socket.on("bye", (left) => {
+    addMessage(`${left} Left`);
 });
 
 // addMessage가 파라미터로 msg를 이미 받고있기 때문에(정의상)
 // 그냥 함수명만 써줘도 됨
 // 받은 메시지 표시하는 함수
-socket.on("new_message", (msg)=>{
-    const ul = room.querySelector("ul");
-    const li = document.createElement("li");
-    li.innerText = "상대방 : " + msg;
-    ul.appendChild(li);
-});
+socket.on("new_message", addMessage);

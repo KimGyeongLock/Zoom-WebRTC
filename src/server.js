@@ -18,6 +18,7 @@ const httpServer = http.createServer(app);
 const wsServer = SocketIO(httpServer);
 
 wsServer.on("connection", socket => {
+    socket["nickname"] = "Anon";
     socket.onAny((e)=>{
         console.log(`Socket Event: ${e}`);
     });
@@ -25,16 +26,17 @@ wsServer.on("connection", socket => {
         socket.join(roomName);
         done();
         // 입장 알림을 roomName에 있는 본인 제외한 모두에게 알림
-        socket.to(roomName).emit("welcome");
+        socket.to(roomName).emit("welcome", socket.nickname);
     });
     socket.on("disconnecting", () => {
         // socket.rooms는 set의 형태이므로
-        socket.rooms.forEach(room => socket.to(room).emit("bye"));
+        socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname));
     });
     socket.on("new_message", (msg, room, done)=> {
-        socket.to(room).emit("new_message", msg);
+        socket.to(room).emit("new_message", `${socket.nickname}: ${msg}`);
         done();
     });
+    socket.on("nickname", (nickname) => (socket["nickname"] = nickname));
 });
 
 
