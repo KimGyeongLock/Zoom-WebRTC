@@ -1,7 +1,8 @@
 import express from "express";
 import http from "http";
-import { WebSocketServer } from "ws";
-import SocketIO from "socket.io";
+// import SocketIO from "socket.io";
+import { Server } from "socket.io";
+import { instrument } from "@socket.io/admin-ui";
 
 const app = express();
 
@@ -15,7 +16,19 @@ const handleListen = () => console.log('Listening on http://localhost:3000');
 
 // 같은 서버에서 http랑 ws 서버 둘 다 돌림(같은 포트에서 처리 가능)
 const httpServer = http.createServer(app);
-const wsServer = SocketIO(httpServer);
+// const wsServer = SocketIO(httpServer);
+const wsServer = new Server(httpServer, {
+    cors: {
+      origin: ["https://admin.socket.io"],
+      credentials: true
+    }
+  }
+);
+
+instrument(wsServer, {
+    auth: false,
+    mode: "development",
+  });
 
 function publicRooms() {
     const sids = wsServer.sockets.adapter.sids;
@@ -29,6 +42,10 @@ function publicRooms() {
     return publicRooms;
 }
 
+function countRoom(roomName){
+    return wsServer.sockets.adapter.rooms.get(roomName)?.size; 
+}
+
 wsServer.on("connection", socket => {
     socket["nickname"] = "Anon";
     socket.onAny((e)=>{
@@ -39,14 +56,17 @@ wsServer.on("connection", socket => {
         socket.join(roomName);
         done();
         // 입장 알림을 roomName에 있는 본인 제외한 모두에게 알림
-        socket.to(roomName).emit("welcome", socket.nickname);
+        socket.to(roomName).emit("welcome", socket.nickname, countRoom(roomName));
         wsServer.sockets.emit("room_change", publicRooms());
     });
     socket.on("disconnecting", () => {
         // socket.rooms는 set의 형태이므로
         socket.rooms.forEach(room =>
-             socket.to(room).emit("bye", socket.nickname)
-            );
+            // countRoom -1 인 이유는
+            // disconnecting은 아직 방을 떠나지 않았으므로 아직 본인이 포함되어있는 상태
+            // 그래서 본인을 빼 줘야함
+            socket.to(room).emit("bye", socket.nickname, countRoom(room)-1)
+        );
     });
     socket.on("disconnect", ()=>{
         wsServer.sockets.emit("room_change", publicRooms());
@@ -60,30 +80,3 @@ wsServer.on("connection", socket => {
 
 
 httpServer.listen(3000, handleListen);
-
-// const wss = new WebSocketServer({server});
-// 누군가가 서버에 연결하면 여기다가 넣어줄 것(디비 역할)
-// const sockets = [];
-// wss.on("connection", (socket) => {
-//     sockets.push(socket);
-//     // 닉네임 입력 안한사람들 위해서  
-//     socket["nickname"] = "anonymous";
-//     console.log("Connected to Server ");
-//     // 브라우저와의 연결이 닫혔을 때 실행
-//     socket.on("close", () => {
-//         console.log("Disconnected from the Browser");
-//     });
-//     // 브라우저로부터 뭔가 메시지를 받았을때 
-//     socket.on("message", msg => {
-//         const message = JSON.parse(msg);
-//         switch(message.type){
-//             case "new_message":
-//                 sockets.forEach((aSocket) => aSocket.send(`${socket.nickname}: ${message.payload}`));
-//                 break;
-//             case "nickname":
-//                 socket["nickname"] = message.payload;
-//                 break;
-//         }
-//     });
-// });
-// server.listen(3000, handleListen);
