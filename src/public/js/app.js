@@ -73,3 +73,22 @@ socket.on("bye", (left) => {
 // 그냥 함수명만 써줘도 됨
 // 받은 메시지 표시하는 함수
 socket.on("new_message", addMessage);
+
+socket.on("room_change", (rooms)=> {
+    // 이게 없으면 아래의 foreach가 돌아가지 않기 때문에 
+    // 방이 하나도 없으면 갱신이 안됨.
+    // 그래서 방이 하나도 없으면 빈칸을 만들고 종료시킴
+    const roomList = welcome.querySelector("ul");
+    // rooms가 하나도 없을때만 비워주면 새로운게 추가되었을때 중복된 방 이름이 또 붙게 되므로
+    // 이걸 실행할때마다 그냥 리스트 비워주고 시작
+    roomList.innerHTML = "";
+    if(rooms.length == 0){
+        return;
+    }
+    
+    rooms.forEach(room => {
+        const li = document.createElement("li");
+        li.innerText = room;
+        roomList.append(li);
+    });
+});
