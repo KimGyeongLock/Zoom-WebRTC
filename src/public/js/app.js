@@ -8,7 +8,7 @@ const muteBtn = document.getElementById("mute");
 const cameraBtn = document.getElementById("camera");
 const camerasSelect = document.getElementById("cameras");
 
-const welcome = document.getElementById("welcome");
+
 const call = document.getElementById("call");
 
 call.hidden = true;
@@ -19,6 +19,7 @@ let muted = false;
 // 카메라 on/off 유무 tracking
 let cameraOff = false;
 let roomName;
+let myPeerConnection;
 
 async function getCameras(){
     try {
@@ -109,13 +110,14 @@ cameraBtn.addEventListener("click", handleCameraClick);
 camerasSelect.addEventListener("input", handleCameraChange);
 
 // Welcome Form (join a room)
+const welcome = document.getElementById("welcome");
+const welcomeForm = welcome.querySelector("form");
 
-welcomeForm = welcome.querySelector("form");
-
-function startMedia(){
+async function startMedia(){
     welcome.hidden = true;
     call.hidden = false;
-    getMedia();
+    await getMedia();
+    makeConnection();
 }
 
 function handleWelcomeSubmit(e){
@@ -130,6 +132,20 @@ welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 
 
 // Socket code
-socket.on("welcome", () => {
-    console.log("someone joined");
-})
+socket.on("welcome", async () => {
+    // someone joined를 받는 사람이 Offer을 보내는 사람이 될 것임.
+    //console.log("someone joined");
+    const offer = await myPeerConnection.createOffer();
+    console.log(offer);
+});
+
+// RTC code
+// RTC step1. peerConnection을 브라우저와 브라우저 사이에 만듬
+// addStream은 낡은 함수라서 지금은 사용안함 -> addTrack씀
+function makeConnection(){
+    myPeerConnection = new RTCPeerConnection();
+    // 양쪽 브라우저에서 카메라와 마이크의 데이터 stream을 받아서 그것들을 연결 안에 집어넣음
+    myStream
+        .getTracks()
+        .forEach(track => myPeerConnection.addTrack(track, myStream));
+}
