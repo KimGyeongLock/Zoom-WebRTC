@@ -192,6 +192,9 @@ function makeConnection(){
     myPeerConnection = new RTCPeerConnection();
     // peerConnection을 만든 직후 Ice Candidate를 생성해야 함
     myPeerConnection.addEventListener("icecandidate", handleIce);
+    // Answer & Offer -> exchange ICE candidates까지 했다면
+    // addStream 을 해줘야 할 차례
+    myPeerConnection.addEventListener("addstream", handleAddStream);
     // 양쪽 브라우저에서 카메라와 마이크의 데이터 stream을 받아서 그것들을 연결 안에 집어넣음
     myStream
         .getTracks()
@@ -202,6 +205,13 @@ function makeConnection(){
 // 이건 local ICE를 peer(상대)에게 보내는 함수
 function handleIce(data){
     socket.emit("ice", data.candidate, roomName);
-    console.log("sent ice candidate ");
-    
+    console.log("sent ice candidate ");   
+}
+
+// ICE 후보들까지 교환하고 나서 peer(상대)의 stream을 등록
+function handleAddStream(data) {
+    const peerFace = document.getElementById("peerFace");
+    console.log("got an stream from my peer : ", data.stream);
+    console.log("My Stream : ", myStream);
+    peerFace.srcObject = data.stream;
 }
