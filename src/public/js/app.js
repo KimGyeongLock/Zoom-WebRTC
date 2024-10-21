@@ -138,7 +138,7 @@ socket.on("welcome", async () => {
     const offer = await myPeerConnection.createOffer();
     // caller
     myPeerConnection.setLocalDescription(offer);
-    console.log("sent to : ", roomName);
+    console.log("caller : sent to : ", roomName);
     // 어느 방에 전송할지, 그 방의 누구에게 전송할 지
     socket.emit("offer", offer, roomName);
 });
@@ -149,9 +149,28 @@ socket.on("welcome", async () => {
 
 // 그리고 상대의 sdp(offer나 answer, 여기서는 offer)
 // 를 저장함(setRemoteDescription)
-socket.on("offer", (offer)=> {
-    console.log("offer received : ", offer);
+
+// 그리고 sdp(answer)를 생성함
+// answer를 localDescription으로 등록하고 
+// 서버에 answer 이벤트로 보냄
+
+// Peer B(callee)의 remoteDescription 이후 
+// getUserMedia랑 addStream(addTrack)은 makeConnection에서 이미
+// 방에 입장할때 해 주었으므로 따로 하지 않음.
+socket.on("offer", async (offer)=> {
+    console.log("callee : offer received : ", offer);
     myPeerConnection.setRemoteDescription(offer);
+    const answer = await myPeerConnection.createAnswer();
+    console.log("callee : answer 생성 : ", answer);
+    myPeerConnection.setLocalDescription(answer);
+    socket.emit("answer", answer, roomName);
+});
+
+// caller는 callee의 answer sdp를 받아서 
+// remoteDescription에 등록함.
+socket.on("answer", answer => {
+    console.log("caller : answer received from callee : ", answer);
+    myPeerConnection.setRemoteDescription(answer);
 });
 
 
