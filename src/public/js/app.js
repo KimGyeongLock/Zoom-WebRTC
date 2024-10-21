@@ -131,8 +131,8 @@ async function handleWelcomeSubmit(e){
 
 welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 
+/////////////////////////// Socket code /////////////////////////////
 
-// Socket code
 socket.on("welcome", async () => {
     // caller가 SDP를 생성함(offer)
     const offer = await myPeerConnection.createOffer();
@@ -160,10 +160,14 @@ socket.on("welcome", async () => {
 socket.on("offer", async (offer)=> {
     console.log("callee : offer received : ", offer);
     myPeerConnection.setRemoteDescription(offer);
+
     const answer = await myPeerConnection.createAnswer();
     console.log("callee : answer 생성 : ", answer);
+    
     myPeerConnection.setLocalDescription(answer);
+
     socket.emit("answer", answer, roomName);
+    console.log("callee : sent answer");
 });
 
 // caller는 callee의 answer sdp를 받아서 
@@ -173,14 +177,31 @@ socket.on("answer", answer => {
     myPeerConnection.setRemoteDescription(answer);
 });
 
+// caller, callee 두 브라우저에서 둘 다 일어남
+// peer(상대)가 보낸 ICE candidate 받는 함수
+socket.on("ice", ice => {
+    console.log("received ice candidate ");
+    myPeerConnection.addIceCandidate(ice);
+});
 
-// RTC code
+//////////////////////// RTC code //////////////////////////////////////
+
 // RTC step1. peerConnection을 브라우저와 브라우저 사이에 만듬
 // addStream은 낡은 함수라서 지금은 사용안함 -> addTrack씀
 function makeConnection(){
     myPeerConnection = new RTCPeerConnection();
+    // peerConnection을 만든 직후 Ice Candidate를 생성해야 함
+    myPeerConnection.addEventListener("icecandidate", handleIce);
     // 양쪽 브라우저에서 카메라와 마이크의 데이터 stream을 받아서 그것들을 연결 안에 집어넣음
     myStream
         .getTracks()
         .forEach(track => myPeerConnection.addTrack(track, myStream));
+}
+
+// caller, callee 둘 다의 브라우저에서 일어남
+// 이건 local ICE를 peer(상대)에게 보내는 함수
+function handleIce(data){
+    socket.emit("ice", data.candidate, roomName);
+    console.log("sent ice candidate ");
+    
 }
