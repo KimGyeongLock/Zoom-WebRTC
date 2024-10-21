@@ -17,9 +17,8 @@ const httpServer = http.createServer(app);
 const wsServer = SocketIO(httpServer);
 
 wsServer.on("connection", socket => {
-    socket.on("join_room", (roomName, done) => {
+    socket.on("join_room", (roomName) => {
         socket.join(roomName);
-        done();
         socket.to(roomName).emit("welcome");
     });
     // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
