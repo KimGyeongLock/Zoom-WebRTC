@@ -21,6 +21,9 @@ let cameraOff = false;
 let roomName;
 let myPeerConnection;
 
+// 실시간 채팅을 위한 DataChannel
+let myDataChannel;
+
 async function getCameras(){
     try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -146,7 +149,15 @@ welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 
 /////////////////////////// Socket code /////////////////////////////
 
+// caller쪽에서 실행되는 것
 socket.on("welcome", async () => {
+    // DataChannel은 Offer을 생성해주기 전에 만들어야 함
+    myDataChannel = myPeerConnection.createDataChannel("chat");
+    // 관련 이벤트 리스너 등록해주기
+    myDataChannel.addEventListener("message", (msg)=> {
+        console.log(msg.data.toString());
+    });
+
     // caller가 SDP를 생성함(offer)
     const offer = await myPeerConnection.createOffer();
     // caller
@@ -171,6 +182,14 @@ socket.on("welcome", async () => {
 // getUserMedia랑 addStream(addTrack)은 makeConnection에서 이미
 // 방에 입장할때 해 주었으므로 따로 하지 않음.
 socket.on("offer", async (offer)=> {
+    myPeerConnection.addEventListener("datachannel", (e)=>{
+        myDataChannel = e.channel;
+        myDataChannel.addEventListener("message", (msg)=> {
+            console.log(msg.data.toString());
+        });
+    });
+
+
     console.log("callee : offer received : ", offer);
     myPeerConnection.setRemoteDescription(offer);
 
@@ -205,12 +224,11 @@ function makeConnection(){
     myPeerConnection = new RTCPeerConnection({
         iceServers: [
             {
+                // 5개 이상 쓰면 안 됨
                 urls: [
                     "stun:stun.l.google.com:19302",
                     "stun:stun1.l.google.com:19302",
                     "stun:stun2.l.google.com:19302",
-                    "stun:stun3.l.google.com:19302",
-                    "stun:stun4.l.google.com:19302",
                 ],
             },
         ],
