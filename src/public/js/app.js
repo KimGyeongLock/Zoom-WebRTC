@@ -202,7 +202,19 @@ socket.on("ice", ice => {
 // RTC step1. peerConnection을 브라우저와 브라우저 사이에 만듬
 // addStream은 낡은 함수라서 지금은 사용안함 -> addTrack씀
 function makeConnection(){
-    myPeerConnection = new RTCPeerConnection();
+    myPeerConnection = new RTCPeerConnection({
+        iceServers: [
+            {
+                urls: [
+                    "stun:stun.l.google.com:19302",
+                    "stun:stun1.l.google.com:19302",
+                    "stun:stun2.l.google.com:19302",
+                    "stun:stun3.l.google.com:19302",
+                    "stun:stun4.l.google.com:19302",
+                ],
+            },
+        ],
+    });
     // peerConnection을 만든 직후 Ice Candidate를 생성해야 함
     myPeerConnection.addEventListener("icecandidate", handleIce);
     // Answer & Offer -> exchange ICE candidates까지 했다면
