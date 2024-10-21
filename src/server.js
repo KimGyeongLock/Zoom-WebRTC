@@ -22,6 +22,11 @@ wsServer.on("connection", socket => {
         done();
         socket.to(roomName).emit("welcome");
     });
+    // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
+    socket.on("offer", (offer, roomName)=>{
+        // console.log("roomName:", roomName, " offer : ", offer);
+        socket.to(roomName).emit("offer", offer);
+    })
 });
 
 const handleListen = () => console.log('Listening on http://localhost:3000');

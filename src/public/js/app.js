@@ -133,11 +133,26 @@ welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 
 // Socket code
 socket.on("welcome", async () => {
-    // someone joined를 받는 사람이 Offer을 보내는 사람이 될 것임.
-    //console.log("someone joined");
+    // caller가 SDP를 생성함(offer)
     const offer = await myPeerConnection.createOffer();
-    console.log(offer);
+    // caller
+    myPeerConnection.setLocalDescription(offer);
+    console.log("sent to : ", roomName);
+    // 어느 방에 전송할지, 그 방의 누구에게 전송할 지
+    socket.emit("offer", offer, roomName);
 });
+
+// callee가 caller가 프론트에서 offer로 보낸 sdp가
+// 서버에서 emit(offer, roomName)으로 처리됬기 때문에
+// 다시 callee의 프론트에서 해당 이벤트를 받아서 offer를 받음
+
+// 그리고 상대의 sdp(offer나 answer, 여기서는 offer)
+// 를 저장함(setRemoteDescription)
+socket.on("offer", (offer)=> {
+    console.log("offer received : ", offer);
+    myPeerConnection.setRemoteDescription(offer);
+});
+
 
 // RTC code
 // RTC step1. peerConnection을 브라우저와 브라우저 사이에 만듬
