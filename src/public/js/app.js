@@ -101,8 +101,21 @@ function handleCameraClick(){
     }
 }
 
+// 카메라 입력 장치 바꿧을 때 
+// peer video에도 바뀌게끔 수정
 async function handleCameraChange(){
+    // 여기서 새 deviceID로 mediaStream을 생성하게 됨.
     await getMedia(camerasSelect.value);
+    if(myPeerConnection){
+        // 그럼 여기서 저 새 deviceID로 stream 접근 가능
+        const videoTrack = myStream.getVideoTracks()[0];
+        const videoSender = myPeerConnection.getSenders()
+            .find(sender => sender.track.kind === "video");
+        console.log(videoSender);
+        // 지금 내 stream을 보내는 sender에게 아까 선택한 videoTrack으로
+        // track을 교체하고 그걸로 송출함
+        videoSender.replaceTrack(videoTrack);
+    }
 }
 
 muteBtn.addEventListener("click", handleMuteClick);
