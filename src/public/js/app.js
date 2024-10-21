@@ -5,6 +5,9 @@ const socket = io();
 // stream은 유저의 비디오와 오디오가 항상 합쳐진 형태임.
 const myFace = document.getElementById("myFace");
 const call = document.getElementById("call");
+const endCallBtn = call.querySelector("button");
+
+endCallBtn.addEventListener("click", handleEndCall);
 
 // 하울링 방지
 document.getElementById("myFace").volume = 0;
@@ -49,7 +52,10 @@ async function initCall(){
     welcome.hidden = true;
     call.hidden = false;
     await getMedia();
-    makeConnection();
+    // 기존 PeerConnection이 남아 있는 경우를 대비해 새로 설정
+    if (!myPeerConnection) {
+        makeConnection();
+    }
 }
 
 async function handleWelcomeSubmit(e){
@@ -187,4 +193,22 @@ function handleAddStream(data) {
     console.log("got an stream from my peer : ", data.stream);
     console.log("My Stream : ", myStream);
     peerFace.srcObject = data.stream;
+}
+
+function handleEndCall(){
+    socket.emit("leave_room", roomName);
+    // peerConnection을 종료해서 통화 중지
+    if(myPeerConnection){
+        myPeerConnection.close();
+        myPeerConnection = null;
+    }
+
+    call.hidden = true;
+    welcome.hidden = false;
+
+    if(myStream){
+        myStream.getTracks().forEach(track => track.stop());
+    }
+
+    roomName = null;
 }

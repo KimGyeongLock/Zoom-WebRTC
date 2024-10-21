@@ -29,7 +29,11 @@ wsServer.on("connection", socket => {
     });
     socket.on("ice", (ice, roomName)=> {
         socket.to(roomName).emit("ice", ice);
-    })
+    });
+    // 통화 종료 
+    socket.on("leave_room", (roomName)=> {
+        socket.leave(roomName);
+    });
 });
 
 const handleListen = () => console.log('Listening on http://localhost:3000');
