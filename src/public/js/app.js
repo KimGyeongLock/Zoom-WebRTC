@@ -8,6 +8,8 @@ const call = document.getElementById("call");
 const endCallBtn = call.querySelector("button");
 // 이메일 입력칸
 const emailInput = document.getElementById("email");
+// 알림 로그 출력칸
+const logList = document.getElementById("logList");
 
 endCallBtn.addEventListener("click", handleEndCall);
 
@@ -238,3 +240,15 @@ function handleEndCall(){
 
     roomName = null;
 }
+
+// 입장, 퇴장 알림 로그 메시지를 출력하는 함수
+function addLogMessage(message) {
+    const li = document.createElement("li");
+    li.textContent = message;
+    logList.appendChild(li);
+}
+
+// 서버에서 notification 이벤트를 받으면 실행
+socket.on("notification", (message) => {
+    addLogMessage(message);
+})

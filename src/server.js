@@ -33,6 +33,9 @@ wsServer.on("connection", socket => {
                 // 클라이언트가 welcome_self 처리를 완료했다는 응답을 보낸 후 실행
                 socket.to(roomName).emit("welcome");
             });
+
+            // 입장한 사용자의 이메일로 입장 알림을 줌
+            wsServer.to(roomName).emit("notification", `${email}님이 입장하셨습니다.`);
         }
     });
     // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
@@ -50,6 +53,7 @@ wsServer.on("connection", socket => {
     socket.on("leave_room", (roomName)=> {
         console.log(socket.email, "님이 방 ", roomName, "에서 나갔습니다.");
         socket.leave(roomName);
+        wsServer.to(roomName).emit("notification", `${socket.email}님이 퇴장하셨습니다.`);
     });
 });
 
