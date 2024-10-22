@@ -1,6 +1,5 @@
 import express from "express";
 import http from "http";
-import { resolve } from "path";
 import SocketIO from "socket.io";
 
 const app = express();

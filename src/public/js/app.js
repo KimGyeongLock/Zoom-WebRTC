@@ -8,20 +8,20 @@ const call = document.getElementById("call");
 const endCallBtn = call.querySelector("button");
 // 이메일 입력칸
 const emailInput = document.getElementById("email");
-// 알림 로그 출력칸
+// 알림 로그 출력칸, 음성 텍스트 변환 결과 도 표시 
 const logList = document.getElementById("logList");
 
 // voice w voice, voice w chat, chat w chat
 const chatBox = document.getElementById("chatBox");
 const chatForm = document.getElementById("chatForm");
 
+call.hidden = true;
+chatBox.hidden = true;
+
 endCallBtn.addEventListener("click", handleEndCall);
 
 // 하울링 방지
 document.getElementById("myFace").volume = 0;
-
-call.hidden = true;
-chatBox.hidden = true;
 
 let myStream;
 let roomName;
@@ -40,8 +40,6 @@ async function getMedia(deviceId){
         video: false,
     };
     try{
-        // deviceId가 있으면 (선택한 기기가 있으면) 그걸로 카메라로 쓰고
-        // 없거나 맨 처음에 켠 상태라면 selfie 카메라를 기준으로 가져옴
         myStream = await navigator.mediaDevices.getUserMedia(
             initialConstraints
         );
@@ -90,9 +88,6 @@ async function handleWelcomeSubmit(e){
     const email = emailInput.value;
     const room = roomInput.value;
     const screenType = welcomeForm.querySelector("input[name='screenType']:checked").value;
-    
-    // 방 인원 제한때문에 주석처리
-    //await initCall();
 
     // 방과 이메일을 함께 서버에 전송
     socket.emit("join_room", room, email);
