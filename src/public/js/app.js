@@ -11,12 +11,17 @@ const emailInput = document.getElementById("email");
 // 알림 로그 출력칸
 const logList = document.getElementById("logList");
 
+// voice w voice, voice w chat, chat w chat
+const chatBox = document.getElementById("chatBox");
+const chatForm = document.getElementById("chatForm");
+
 endCallBtn.addEventListener("click", handleEndCall);
 
 // 하울링 방지
 document.getElementById("myFace").volume = 0;
 
 call.hidden = true;
+chatBox.hidden = true;
 
 let myStream;
 let roomName;
@@ -30,7 +35,7 @@ async function getMedia(deviceId){
         audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            autoGainControl: false // 자동 이득 제어 비활성화
+            autoGainControl: false
         },
         video: false,
     };
@@ -84,6 +89,7 @@ async function handleWelcomeSubmit(e){
     const roomInput = welcomeForm.querySelector("input#room");
     const email = emailInput.value;
     const room = roomInput.value;
+    const screenType = welcomeForm.querySelector("input[name='screenType']:checked").value;
     
     // 방 인원 제한때문에 주석처리
     //await initCall();
@@ -93,6 +99,16 @@ async function handleWelcomeSubmit(e){
     roomName = room;
     roomInput.value = "";
     emailInput.value = "";
+
+    // 화면 종류에 따라 다른 화면 보여주기
+    if(screenType == "voice"){
+        call.hidden = false;
+        chatBox.hidden = true;
+    }
+    else if(screenType == "chat"){
+        call.hidden = false;
+        chatBox.hidden = false;
+    }
 }
 
 welcomeForm.addEventListener("submit", handleWelcomeSubmit);
@@ -131,6 +147,8 @@ socket.on("welcome", async () => {
 // Peer B(callee)의 remoteDescription 이후 
 // getUserMedia랑 addStream(addTrack)은 makeConnection에서 이미
 // 방에 입장할때 해 주었으므로 따로 하지 않음.
+
+// callee 쪽에서 실행되는 것
 socket.on("offer", async (offer)=> {
     // offer를 받는 callee는 만들어진 datachannel를 받아서 사용하고
     // 거기다가 이벤트 리스너만 달면 된다.
@@ -232,6 +250,7 @@ function handleEndCall(){
     }
 
     call.hidden = true;
+    chatBox.hidden = true;
     welcome.hidden = false;
 
     if(myStream){
@@ -251,4 +270,4 @@ function addLogMessage(message) {
 // 서버에서 notification 이벤트를 받으면 실행
 socket.on("notification", (message) => {
     addLogMessage(message);
-})
+});

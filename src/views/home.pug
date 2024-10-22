@@ -3,22 +3,32 @@ html(lang="en")
     head
         meta(charset="UTF-8")
         meta(name="viewport", content="width=device-width, initial-scale=1.0")
-        title Noom
+        title 앵무말
         link(rel="stylesheet", href="https://unpkg.com/mvp.css")
     body 
         header
-            h1 Noom
+            h1 앵무말
         main
             div#welcome
                 form
                     input#email(placeholder="Email", required, type="email")
-                    input#room(placeholder="room name", required, type="text")                    
+                    input#room(placeholder="room name", required, type="text")
+                    div
+                        input#voiceOnly(type="radio", name="screenType", value="voice", checked)
+                        label(for="voiceOnly") Voice Only
+                        input#chatAndVoice(type="radio", name="screenType", value="chat")
+                        label(for="chatAndVoice") Call with Chat
+                        
                     button Enter Room
-        div#call 
+        div#call
             div#myStream
             ul#logList
             video#myFace(autoplay, playsinline, width="0", height="0")
             button end call
+        div#chatBox
+            form#chatForm
+                input#chatInput(placeholder="Type a message", required, type="text")
+                button Send
         video#peerFace(autoplay, playsinline, width="0", height="0")
         script(src="/socket.io/socket.io.js")
         script(src="/public/js/app.js")
