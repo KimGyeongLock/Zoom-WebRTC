@@ -1,5 +1,6 @@
 import express from "express";
 import http from "http";
+import { resolve } from "path";
 import SocketIO from "socket.io";
 
 const app = express();
@@ -15,9 +16,21 @@ const httpServer = http.createServer(app);
 const wsServer = SocketIO(httpServer);
 
 wsServer.on("connection", socket => {
-    socket.on("join_room", (roomName) => {
-        socket.join(roomName);
-        socket.to(roomName).emit("welcome");
+    socket.on("join_room", async (roomName) => {
+        const room = wsServer.sockets.adapter.rooms.get(roomName);
+        const userCount = room ? room.size : 0;
+
+        // 2명 이상이면 room_full event 발생시킴
+        if(userCount >= 2)
+            socket.emit("room_full");
+        else {
+            socket.join(roomName);
+            // 자기 자신도 initCall을 호출할 수 있게 함
+            socket.emit("welcome_self", () => {
+                // 클라이언트가 welcome_self 처리를 완료했다는 응답을 보낸 후 실행
+                socket.to(roomName).emit("welcome");
+            });
+        }
     });
     // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
     socket.on("offer", (offer, roomName)=>{

@@ -58,10 +58,28 @@ async function initCall(){
     }
 }
 
+// 방이 꽉 찼을 때 실행됨
+socket.on("room_full", () => {
+    alert("해당 방은 이미 통화가 진행 중입니다. 입장할 수 없습니다.");
+    call.hidden = true;
+    welcome.hidden = false;
+});
+
+// 입장했을때 자신에게 전송된 welcome_self로 initCall 호출해서
+// myPeerConnection 초기화
+socket.on("welcome_self", async (callback) => {
+    await initCall();
+    if(callback){
+        // 서버로 ack을 보냄
+        callback();
+    }
+});
+
 async function handleWelcomeSubmit(e){
     e.preventDefault();
     const input = welcomeForm.querySelector("input");
-    await initCall();
+    // 방 인원 제한때문에 주석처리
+    //await initCall();
     socket.emit("join_room", input.value);
     roomName = input.value;
     input.value = "";
