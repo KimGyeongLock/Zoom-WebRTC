@@ -6,6 +6,8 @@ const socket = io();
 const myFace = document.getElementById("myFace");
 const call = document.getElementById("call");
 const endCallBtn = call.querySelector("button");
+// 이메일 입력칸
+const emailInput = document.getElementById("email");
 
 endCallBtn.addEventListener("click", handleEndCall);
 
@@ -77,12 +79,18 @@ socket.on("welcome_self", async (callback) => {
 
 async function handleWelcomeSubmit(e){
     e.preventDefault();
-    const input = welcomeForm.querySelector("input");
+    const roomInput = welcomeForm.querySelector("input#room");
+    const email = emailInput.value;
+    const room = roomInput.value;
+    
     // 방 인원 제한때문에 주석처리
     //await initCall();
-    socket.emit("join_room", input.value);
-    roomName = input.value;
-    input.value = "";
+
+    // 방과 이메일을 함께 서버에 전송
+    socket.emit("join_room", room, email);
+    roomName = room;
+    roomInput.value = "";
+    emailInput.value = "";
 }
 
 welcomeForm.addEventListener("submit", handleWelcomeSubmit);
@@ -145,14 +153,14 @@ socket.on("offer", async (offer)=> {
 
 // caller는 callee의 answer sdp를 받아서 
 // remoteDescription에 등록함.
-socket.on("answer", answer => {
+socket.on("answer", (answer) => {
     console.log("caller : answer received from callee : ", answer);
     myPeerConnection.setRemoteDescription(answer);
 });
 
 // caller, callee 두 브라우저에서 둘 다 일어남
 // peer(상대)가 보낸 ICE candidate 받는 함수
-socket.on("ice", ice => {
+socket.on("ice", (ice) => {
     console.log("received ice candidate ");
     myPeerConnection.addIceCandidate(ice);
 });
