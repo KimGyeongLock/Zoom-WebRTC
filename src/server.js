@@ -26,7 +26,7 @@ let audioStream = new PassThrough();
 
 const LanguageCode = "ko-KR";
 const MediaEncoding = "pcm";
-const MediaSampleRateHertz = "16000";
+const MediaSampleRateHertz = 16000;
 
 async function startTranscribe() {
     const client = new TranscribeStreamingClient({
@@ -54,9 +54,21 @@ async function startTranscribe() {
 
     const response = await client.send(command);
 
+    // 이벤트 수신까지는 확인함
+    // 이 부분 고쳐 보기 
     try {
         for await ( const event of response.TranscriptResultStream){
-            console.log(JSON.stringify(event));
+            const transcriptEvent = event.TranscriptEvent;
+            if (transcriptEvent && transcriptEvent.Transcript) {
+                const results = transcriptEvent.Transcript.Results;
+
+                for (const result of results) {
+                    if (!result.IsPartial) {  // 확정된 결과만 처리
+                        const transcripts = result.Alternatives[0].Transcript;
+                        console.log("Final Transcript:", transcripts);
+                    }
+                }
+            }
         }
     }
     catch(error) {
@@ -91,6 +103,7 @@ wsServer.on("connection", socket => {
     });
     socket.on("audio_chunk", (chunk) => {
         // 클라이언트에서 받은 오디오 데이터를 audioStream에 추가
+        // console.log("Received audio chunk:", chunk); 
         audioStream.write(chunk);
     });
     // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
