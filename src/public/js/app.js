@@ -44,6 +44,23 @@ async function getMedia(deviceId){
             initialConstraints
         );
         myFace.srcObject = myStream;
+        
+        // AudioContext 생성
+        const audioContext = new AudioContext();
+
+        // AudioWorkletProcessor 등록
+        await audioContext.audioWorklet.addModule('/public/js/audio-processor.js');
+
+        const source = audioContext.createMediaStreamSource(myStream);
+        const processor = new AudioWorkletNode(audioContext, 'audio-processor');
+
+        // AudioProcessor에서 메인 스레드로 전송된 데이터를 받음
+        processor.port.onmessage = (event) => {
+            const audioChunk = event.data;
+            socket.emit("audio_chunk", audioChunk);
+        };
+
+        source.connect(processor);
     }
     catch(e){
         console.log(e);
