@@ -44,7 +44,6 @@ async function getMedia(deviceId){
             initialConstraints
         );
         myFace.srcObject = myStream;
-        
         // AudioContext 생성
         const audioContext = new AudioContext();
 
@@ -57,6 +56,7 @@ async function getMedia(deviceId){
         // AudioProcessor에서 메인 스레드로 전송된 데이터를 받음
         processor.port.onmessage = (event) => {
             const audioChunk = event.data;
+            console.log("MyStream Audio chunk received: ", audioChunk);
             socket.emit("audio_chunk", audioChunk);
         };
 
@@ -280,6 +280,7 @@ function addLogMessage(message) {
 }
 
 // 서버에서 notification 이벤트를 받으면 실행
+// 버그 - 무지성으로 다는거라 다른 방에서 왔다갔다 한 것도 기록됨.
 socket.on("notification", (message) => {
     addLogMessage(message);
 });
