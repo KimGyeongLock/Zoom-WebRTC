@@ -103,7 +103,7 @@ wsServer.on("connection", socket => {
     });
     socket.on("audio_chunk", (chunk) => {
         // 클라이언트에서 받은 오디오 데이터를 audioStream에 추가
-        // console.log("Received audio chunk:", chunk); 
+        console.log("Received audio chunk:", chunk); 
         audioStream.write(chunk);
     });
     // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
