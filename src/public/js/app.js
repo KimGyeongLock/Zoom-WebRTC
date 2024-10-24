@@ -30,6 +30,35 @@ let myPeerConnection;
 // 실시간 채팅을 위한 DataChannel
 let myDataChannel;
 
+// AWS가 요구하는 16000 sample rate로 스트림의 sample rate를 다운그레이드함
+// 통화 음질에는 상관 X
+async function downsampleBuffer(buffer, sampleRate, targetSampleRate) {
+    if (sampleRate === targetSampleRate) {
+        return buffer;
+    }
+    
+    const sampleRateRatio = sampleRate / targetSampleRate;
+    const newLength = Math.round(buffer.length / sampleRateRatio);
+    const result = new Float32Array(newLength);
+
+    let offsetResult = 0;
+    let offsetBuffer = 0;
+
+    while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+        let accum = 0, count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+            accum += buffer[i];
+            count++;
+        }
+        result[offsetResult] = accum / count;
+        offsetResult++;
+        offsetBuffer = nextOffsetBuffer;
+    }
+
+    return result;
+}
+
 async function getMedia(deviceId){
     const initialConstraints = {
         audio: {
@@ -46,9 +75,11 @@ async function getMedia(deviceId){
         myFace.srcObject = myStream;
         // AudioContext 생성
         const audioContext = new AudioContext();
+        console.log("Browser's Sample Rate : ", audioContext.sampleRate);
 
         // AudioWorkletProcessor 등록
         await audioContext.audioWorklet.addModule('/public/js/audio-processor.js');
+        // console.log("Audio Worklet Module added successfully");
 
         const source = audioContext.createMediaStreamSource(myStream);
         const processor = new AudioWorkletNode(audioContext, 'audio-processor');
@@ -56,7 +87,15 @@ async function getMedia(deviceId){
         // AudioProcessor에서 메인 스레드로 전송된 데이터를 받음
         processor.port.onmessage = (event) => {
             const audioChunk = event.data;
-            console.log("MyStream Audio chunk received: ", audioChunk);
+            // console.log("MyStream Audio chunk received: ", audioChunk);
+
+            // 다운샘플링이 필요할 때만 처리
+            let processedAudioChunk = audioChunk;
+            if (audioContext.sampleRate !== 16000) {
+                processedAudioChunk = downsampleBuffer(audioChunk, audioContext.sampleRate, 16000);
+                console.log("Downsampled to 16000Hz");
+            }
+
             socket.emit("audio_chunk", audioChunk);
         };
 

@@ -4,21 +4,29 @@ class AudioProcessor extends AudioWorkletProcessor {
         const channelData = input[0]; // mono channel
 
         if (channelData) {
+            // console.log("Processing audio data: ", channelData);
             // ArrayBuffer로 변환하여 메인 스레드로 보냄
-            const audioChunk = new Uint8Array(channelData.buffer);
+            const int16Data = this.convertFloat32ToInt16(channelData);
+            const audioChunk = new Uint8Array(int16Data.buffer);
             this.port.postMessage(audioChunk);
         }
         return true;
     }
+
+    /*
+    AWS Transcribe는 16비트 PCM 형식의 오디오 데이터를 요구함
+    */
+
+    // Float32Array를 Int16Array로 변환하는 함수
+
+    // float32 값은 -1.0 ~ 1.0 범위이므로
+    // Math.min, max 사용해서 범위 잡아주고 곱해줌.
+    // 0x7FFF는 32767를 16진수로 표현한 것
+    // 정수로 표현하는거라 소숫점이 잘리긴 하지만 실제 음질에는 영향 거의 X
+    convertFloat32ToInt16(buffer){
+        return buffer.map(value => Math.max(-1, Math.min(1, value)) * 0x7FFF);
+    }
 }
 
+
 registerProcessor('audio-processor', AudioProcessor);
-
-/*
-todo
-AudioWorklet에서 오디오 데이터를 처리할 때, 데이터를 **Uint16Array**로 변환하는 것은 올바른 접근 방식이 아닙니다. AudioWorklet에서 제공되는 오디오 데이터는 Float32Array 형식으로, -1.0에서 1.0 사이의 범위 값을 가지는 32비트 부동 소수점(32-bit float) 값입니다. 이 값을 16비트 PCM 형식으로 변환해야 합니다.
-
-따라서 Uint16Array 대신, **Int16Array**로 변환한 후 이를 **Uint8Array**로 패키징하여 서버로 전송해야 합니다.
-
-
-*/
