@@ -27,7 +27,7 @@ let abortController = null;
 
 const LanguageCode = "ko-KR";
 const MediaEncoding = "pcm";
-const MediaSampleRateHertz = 16000;
+const MediaSampleRateHertz = 48000;  // 추천되는건 16000
 const targetChunkSize = 16000; // 16kb target chunk size
 const chunkInterval = 500; // 0.5 seconds
 
@@ -103,7 +103,11 @@ async function startTranscribe() {
         }
     }
     catch(error) {
-        console.error("transcribe error : ", error);
+        if (error.name === 'AbortError') {
+            console.log("Transcribe session aborted as expected."); // AbortError를 정상 처리로 인식
+        } else {
+            console.error("Transcribe error:", error); // 다른 오류는 로그에 출력
+        }
     }
     finally {
         // 트랜스크립션 종료 시 세션 비활성화
@@ -133,7 +137,8 @@ wsServer.on("connection", socket => {
             // 입장한 사용자의 이메일로 입장 알림을 줌
             wsServer.to(roomName).emit("notification", `${email}님이 입장하셨습니다.`);
             // AWS Transcribe 시작
-            startTranscribe();
+            if(userCount > 0)
+                startTranscribe();
         }
     });
     socket.on("audio_chunk", (chunk) => {
@@ -156,15 +161,25 @@ wsServer.on("connection", socket => {
     socket.on("leave_room", (roomName)=> {
         console.log(socket.email, "님이 방 ", roomName, "에서 나갔습니다.");
         socket.leave(roomName);
+        
+
+        const room = wsServer.sockets.adapter.rooms.get(roomName);
+        const userCount = room ? room.size : 0;
+        console.log("현재 방 ", roomName, "의 인원은 ", userCount);
         wsServer.to(roomName).emit("notification", `${socket.email}님이 퇴장하셨습니다.`);
 
         // Transcribe 종료 및 audioStream 초기화
-        transcribeSessionActive = false;
-        if(abortController) {
+        
+        // 방에 사용자가 남아있지 않다면 AWS Transcribe 세션 종료
+        if(userCount === 0 && abortController) {
+            transcribeSessionActive = false;
             abortController.abort();
             abortController = null;
+            audioStream = new PassThrough();
+            wsServer.sockets.adapter.rooms.delete(roomName);
+            console.log("Transcribe session aborted.");
+            console.log("방 ", roomName, " 이 삭제되었습니다.")
         }
-        audioStream = new PassThrough();
     });
 });
 

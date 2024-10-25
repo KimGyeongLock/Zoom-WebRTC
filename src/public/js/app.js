@@ -32,32 +32,41 @@ let myDataChannel;
 
 // AWS가 요구하는 16000 sample rate로 스트림의 sample rate를 다운그레이드함
 // 통화 음질에는 상관 X
-async function downsampleBuffer(buffer, sampleRate, targetSampleRate) {
-    if (sampleRate === targetSampleRate) {
-        return buffer;
-    }
+// async function downsampleBuffer(buffer, sampleRate, targetSampleRate) {
+//     if (sampleRate === targetSampleRate) {
+//         return convertFloat32ToInt16(buffer);
+//     }
     
-    const sampleRateRatio = sampleRate / targetSampleRate;
-    const newLength = Math.round(buffer.length / sampleRateRatio);
-    const result = new Float32Array(newLength);
+//     const sampleRateRatio = sampleRate / targetSampleRate;
+//     const newLength = Math.round(buffer.length / sampleRateRatio);
+//     const result = new Float32Array(newLength);
 
-    let offsetResult = 0;
-    let offsetBuffer = 0;
+//     let offsetResult = 0;
+//     let offsetBuffer = 0;
 
-    while (offsetResult < result.length) {
-        const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
-        let accum = 0, count = 0;
-        for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
-            accum += buffer[i];
-            count++;
-        }
-        result[offsetResult] = accum / count;
-        offsetResult++;
-        offsetBuffer = nextOffsetBuffer;
-    }
+//     while (offsetResult < result.length) {
+//         const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+//         let accum = 0, count = 0;
+//         for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+//             accum += buffer[i];
+//             count++;
+//         }
+//         result[offsetResult] = accum / count;
+//         offsetResult++;
+//         offsetBuffer = nextOffsetBuffer;
+//     }
 
-    return result;
-}
+//     return convertFloat32ToInt16(result); // Int16Array로 변환 후 반환
+// }
+
+// // Float32Array를 Int16Array로 변환
+// function convertFloat32ToInt16(buffer) {
+//     const int16Buffer = new Int16Array(buffer.length);
+//     for (let i = 0; i < buffer.length; i++) {
+//         int16Buffer[i] = Math.max(-1, Math.min(1, buffer[i])) * 0x7FFF;
+//     }
+//     return int16Buffer;
+// }
 
 async function getMedia(deviceId){
     const initialConstraints = {
@@ -90,11 +99,11 @@ async function getMedia(deviceId){
             // console.log("MyStream Audio chunk received: ", audioChunk);
 
             // 다운샘플링이 필요할 때만 처리
-            let processedAudioChunk = audioChunk;
-            if (audioContext.sampleRate !== 16000) {
-                processedAudioChunk = downsampleBuffer(audioChunk, audioContext.sampleRate, 16000);
-                console.log("Downsampled to 16000Hz");
-            }
+            // let processedAudioChunk = audioChunk;
+            // if (audioContext.sampleRate !== 16000) {
+            //     processedAudioChunk = downsampleBuffer(audioChunk, audioContext.sampleRate, 16000);
+            //     console.log("Downsampled to 16000Hz");
+            // }
 
             socket.emit("audio_chunk", audioChunk);
         };
@@ -292,8 +301,15 @@ function handleAddStream(data) {
     peerFace.srcObject = data.stream;
 }
 
+// 한명이 나가면 다른 한쪽도 자동으로 나가게끔 함
+// leave_room 이벤트 수신 시 handleEndCall 실행
+socket.on("leave_room", (roomName) => {
+    console.log("Received leave_room event for room:", roomName);
+    handleEndCall();
+});
+
 function handleEndCall(){
-    socket.emit("leave_room", roomName);
+    
     // peerConnection을 종료해서 통화 중지
     if(myPeerConnection){
         myPeerConnection.close();
@@ -307,6 +323,12 @@ function handleEndCall(){
     if(myStream){
         myStream.getTracks().forEach(track => track.stop());
     }
+
+    // transcribe만 종료되던 문제 해결!!!
+    // 먼저 webrtc, ui 정리해주고 
+    // 그다음에 aws transcribe 서비스, room socket.io에서 삭제
+    socket.emit("leave_room", roomName);
+    socket.to(roomName).emit("leave_room");
 
     roomName = null;
 }
