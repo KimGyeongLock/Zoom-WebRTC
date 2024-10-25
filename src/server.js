@@ -4,7 +4,6 @@ import SocketIO from "socket.io";
 import dotenv from 'dotenv';
 import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from "@aws-sdk/client-transcribe-streaming";
 import { PassThrough } from "stream";
-import { AWS } from "aws-sdk";
 
 // dotenv import하고 서버 초기화 전에 .config() 실행해야
 // 환경변수 읽을 수 있음
@@ -23,12 +22,17 @@ const wsServer = SocketIO(httpServer);
 
 // 오디오 데이터를 받을 스트림
 let audioStream = new PassThrough();
+let transcribeSessionActive = false;
+let abortController = null;
 
 const LanguageCode = "ko-KR";
 const MediaEncoding = "pcm";
 const MediaSampleRateHertz = 16000;
+const targetChunkSize = 16000; // 16kb target chunk size
+const chunkInterval = 500; // 0.5 seconds
 
 async function startTranscribe() {
+    abortController = new AbortController();
     const client = new TranscribeStreamingClient({
         region: process.env.AWS_REGION,
         credentials: {
@@ -41,38 +45,69 @@ async function startTranscribe() {
         LanguageCode,
         MediaEncoding,
         MediaSampleRateHertz,
-        AudioStream: (async function* (){
+        AudioStream: (async function* () {
+            let buffer = Buffer.alloc(0);
+    
             for await (const chunk of audioStream) {
-                yield {AudioEvent: {AudioChunk: chunk}};
+                if (!transcribeSessionActive) break;  // 세션 비활성화 시 루프 종료
+                buffer = Buffer.concat([buffer, chunk]);
+    
+                // 0.5초마다 버퍼를 확인하고 16KB 청크로 나누어 전송
+                while (buffer.length >= targetChunkSize) {
+                    const chunkToSend = buffer.subarray(0, targetChunkSize);
+                    buffer = buffer.subarray(targetChunkSize); // 전송된 부분을 버퍼에서 제거
+                    yield { AudioEvent: { AudioChunk: chunkToSend } };
+                    console.log("Transmitting 16KB chunk");
+                }
+    
+                // 0.5초 대기
+                await new Promise(resolve => setTimeout(resolve, chunkInterval));
+            }
+    
+            // 마지막 남은 데이터를 Transcribe로 전달
+            if (buffer.length > 0) {
+                yield { AudioEvent: { AudioChunk: buffer } };
             }
         })(),
-        EnableSpeakerDiarization: true,
-        MaxSpeakerLabels: 2,
     };
 
     const command = new StartStreamTranscriptionCommand(params);
 
-    const response = await client.send(command);
+    
 
     // 이벤트 수신까지는 확인함
     // 이 부분 고쳐 보기 
     try {
-        for await ( const event of response.TranscriptResultStream){
+        transcribeSessionActive = true;
+        const response = await client.send(
+            command,
+            {   
+                // AbortController 연결
+                signal: AbortController.signal
+            } 
+        );
+        
+        // for await...of를 사용하여 TranscriptResultStream 처리
+        for await (const event of response.TranscriptResultStream) {
             const transcriptEvent = event.TranscriptEvent;
             if (transcriptEvent && transcriptEvent.Transcript) {
                 const results = transcriptEvent.Transcript.Results;
-
-                for (const result of results) {
-                    if (!result.IsPartial) {  // 확정된 결과만 처리
-                        const transcripts = result.Alternatives[0].Transcript;
-                        console.log("Final Transcript:", transcripts);
+                console.log("Transcribe event results : ", results);
+                results.forEach(result => {
+                    if (!result.IsPartial) {
+                        const transcript = result.Alternatives[0].Transcript;
+                        console.log("Final Transcript:", transcript);
                     }
-                }
+                });
             }
         }
     }
     catch(error) {
         console.error("transcribe error : ", error);
+    }
+    finally {
+        // 트랜스크립션 종료 시 세션 비활성화
+        transcribeSessionActive = false;
     }
 }
 
@@ -103,7 +138,7 @@ wsServer.on("connection", socket => {
     });
     socket.on("audio_chunk", (chunk) => {
         // 클라이언트에서 받은 오디오 데이터를 audioStream에 추가
-        console.log("Received audio chunk:", chunk); 
+        // console.log("Received audio chunk size:", chunk.length); 
         audioStream.write(chunk);
     });
     // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
@@ -122,6 +157,14 @@ wsServer.on("connection", socket => {
         console.log(socket.email, "님이 방 ", roomName, "에서 나갔습니다.");
         socket.leave(roomName);
         wsServer.to(roomName).emit("notification", `${socket.email}님이 퇴장하셨습니다.`);
+
+        // Transcribe 종료 및 audioStream 초기화
+        transcribeSessionActive = false;
+        if(abortController) {
+            abortController.abort();
+            abortController = null;
+        }
+        audioStream = new PassThrough();
     });
 });
 
