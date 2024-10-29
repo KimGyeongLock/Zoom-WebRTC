@@ -23,9 +23,14 @@ class AudioProcessor extends AudioWorkletProcessor {
     // Math.min, max 사용해서 범위 잡아주고 곱해줌.
     // 0x7FFF는 32767를 16진수로 표현한 것
     // 정수로 표현하는거라 소숫점이 잘리긴 하지만 실제 음질에는 영향 거의 X
-    convertFloat32ToInt16(buffer){
-        return buffer.map(value => Math.max(-1, Math.min(1, value)) * 0x7FFF);
+    convertFloat32ToInt16(buffer) {
+        const int16Buffer = new Int16Array(buffer.length);
+        for (let i = 0; i < buffer.length; i++) {
+            int16Buffer[i] = Math.max(-1, Math.min(1, buffer[i])) * 0x7FFF;
+        }
+        return int16Buffer;
     }
+    
 }
 
 
