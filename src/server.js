@@ -31,7 +31,7 @@ const LanguageCode = "ko-KR";
 const MediaEncoding = "pcm";
 const MediaSampleRateHertz = 16000;  // 추천되는건 16000
 const targetChunkSize = 16000; // 16kb target chunk size
-const chunkInterval = 0.5; // 0.5 seconds
+const chunkInterval = 500; // 0.5 seconds
 
 async function startTranscribe() {
     console.log("startTranscribe function called");
@@ -97,11 +97,11 @@ async function startTranscribe() {
         
         // for await...of를 사용하여 TranscriptResultStream 처리
         for await (const event of response.TranscriptResultStream) {
-            // console.log(event);
+            console.log(event);
             const transcriptEvent = event.TranscriptEvent;
             if (transcriptEvent && transcriptEvent.Transcript) {
                 const results = transcriptEvent.Transcript.Results;
-                // console.log("Transcribe event results : ", results);
+                console.log("Transcribe event results : ", results);
                 results.forEach(result => {
                     if (!result.IsPartial) {
                         const transcript = result.Alternatives[0].Transcript;
