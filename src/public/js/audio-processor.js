@@ -13,12 +13,7 @@ class AudioProcessor extends AudioWorkletProcessor {
         return true;
     }
 
-    /*
-    AWS Transcribe는 16비트 PCM 형식의 오디오 데이터를 요구함
-    */
-
     // Float32Array를 Int16Array로 변환하는 함수
-
     // float32 값은 -1.0 ~ 1.0 범위이므로
     // Math.min, max 사용해서 범위 잡아주고 곱해줌.
     // 0x7FFF는 32767를 16진수로 표현한 것
@@ -30,8 +25,6 @@ class AudioProcessor extends AudioWorkletProcessor {
         }
         return int16Buffer;
     }
-    
 }
-
 
 registerProcessor('audio-processor', AudioProcessor);
