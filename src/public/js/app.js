@@ -30,44 +30,6 @@ let myPeerConnection;
 // 실시간 채팅을 위한 DataChannel
 let myDataChannel;
 
-// AWS가 요구하는 16000 sample rate로 스트림의 sample rate를 다운그레이드함
-// 통화 음질에는 상관 X
-// async function downsampleBuffer(buffer, sampleRate, targetSampleRate) {
-//     if (sampleRate === targetSampleRate) {
-//         return convertFloat32ToInt16(buffer);
-//     }
-
-//     const sampleRateRatio = sampleRate / targetSampleRate;
-//     const newLength = Math.round(buffer.length / sampleRateRatio);
-//     const result = new Float32Array(newLength);
-
-//     let offsetResult = 0;
-//     let offsetBuffer = 0;
-
-//     while (offsetResult < result.length) {
-//         const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
-//         let accum = 0, count = 0;
-//         for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
-//             accum += buffer[i];
-//             count++;
-//         }
-//         result[offsetResult] = accum / count;
-//         offsetResult++;
-//         offsetBuffer = nextOffsetBuffer;
-//     }
-
-//     return convertFloat32ToInt16(result); // Int16Array로 변환 후 반환
-// }
-
-// // Float32Array를 Int16Array로 변환
-// function convertFloat32ToInt16(buffer) {
-//     const int16Buffer = new Int16Array(buffer.length);
-//     for (let i = 0; i < buffer.length; i++) {
-//         int16Buffer[i] = Math.max(-1, Math.min(1, buffer[i])) * 0x7FFF;
-//     }
-//     return int16Buffer;
-// }
-
 async function getMedia(deviceId) {
   const initialConstraints = {
     audio: {
@@ -80,33 +42,7 @@ async function getMedia(deviceId) {
   try {
     myStream = await navigator.mediaDevices.getUserMedia(initialConstraints);
     myFace.srcObject = myStream;
-    // AudioContext 생성
-    const audioContext = new AudioContext();
-    console.log("Browser's Sample Rate : ", audioContext.sampleRate);
-
-    // AudioWorkletProcessor 등록
-    await audioContext.audioWorklet.addModule("/public/js/audio-processor.js");
-    // console.log("Audio Worklet Module added successfully");
-
-    const source = audioContext.createMediaStreamSource(myStream);
-    const processor = new AudioWorkletNode(audioContext, "audio-processor");
-
-    // AudioProcessor에서 메인 스레드로 전송된 데이터를 받음
-    processor.port.onmessage = (event) => {
-      const audioChunk = event.data;
-      // console.log("MyStream Audio chunk received: ", audioChunk);
-
-      // 다운샘플링이 필요할 때만 처리
-      // let processedAudioChunk = audioChunk;
-      // if (audioContext.sampleRate !== 16000) {
-      //     processedAudioChunk = downsampleBuffer(audioChunk, audioContext.sampleRate, 16000);
-      //     console.log("Downsampled to 16000Hz");
-      // }
-
-      socket.emit("audio_chunk", audioChunk);
-    };
-
-    source.connect(processor);
+    
   } catch (e) {
     console.log(e);
   }
@@ -291,11 +227,41 @@ function handleIce(data) {
 }
 
 // ICE 후보들까지 교환하고 나서 peer(상대)의 stream을 등록
-function handleAddStream(data) {
+async function handleAddStream(data) {
   const peerFace = document.getElementById("peerFace");
   console.log("got an stream from my peer : ", data.stream);
   console.log("My Stream : ", myStream);
   peerFace.srcObject = data.stream;
+
+  // AudioContext 생성
+  const audioContext = new AudioContext();
+  
+  // TODO : 상대의 sampleRate 가져와서 동적으로 할당하기
+  // console.log("Peer Browser's Sample Rate : ", audioContext.sampleRate);
+
+  // AudioWorkletProcessor 등록
+  await audioContext.audioWorklet.addModule("/public/js/audio-processor.js");
+  // console.log("Audio Worklet Module added successfully");
+
+  const source = audioContext.createMediaStreamSource(data.stream);
+  const processor = new AudioWorkletNode(audioContext, "audio-processor");
+
+  // AudioProcessor에서 메인 스레드로 전송된 데이터를 받음
+  processor.port.onmessage = (event) => {
+    const audioChunk = event.data;
+    // console.log("MyStream Audio chunk received: ", audioChunk);
+
+    // 다운샘플링이 필요할 때만 처리
+    // let processedAudioChunk = audioChunk;
+    // if (audioContext.sampleRate !== 16000) {
+    //     processedAudioChunk = downsampleBuffer(audioChunk, audioContext.sampleRate, 16000);
+    //     console.log("Downsampled to 16000Hz");
+    // }
+
+    socket.emit("audio_chunk", audioChunk);
+  };
+
+  source.connect(processor);
 }
 
 // 한명이 나가면 다른 한쪽도 자동으로 나가게끔 함
@@ -324,7 +290,6 @@ function handleEndCall() {
   // 먼저 webrtc, ui 정리해주고
   // 그다음에 aws transcribe 서비스, room socket.io에서 삭제
   socket.emit("leave_room", roomName);
-  socket.to(roomName).emit("leave_room");
 
   roomName = null;
 }
@@ -338,8 +303,13 @@ function addLogMessage(message) {
 
 // 서버에서 notification 이벤트를 받으면 실행
 // 계속 방에 기록 남기보단 alert로 대체
-socket.on("notification", (message) => {
+socket.on("notification_welcome", (message) => {
   alert(message);
+});
+
+socket.on("notification_bye", (message) => {
+  alert(message);
+  alert("확인을 누르면 통화가 종료됩니다.");
 });
 
 const chatInput = document.getElementById("chatInput");

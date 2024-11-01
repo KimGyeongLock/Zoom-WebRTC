@@ -23,7 +23,6 @@ const wsServer = SocketIO(httpServer);
 // 오디오 데이터를 받을 스트림
 let audioStream = new PassThrough();
 
-
 let transcribeSessionActive = false;
 let abortController = null;
 
@@ -81,8 +80,6 @@ async function startTranscribe(roomName) {
 
     const command = new StartStreamTranscriptionCommand(params);
 
-    
-
     // 이벤트 수신까지는 확인함
     // 이 부분 고쳐 보기 
     try {
@@ -99,9 +96,11 @@ async function startTranscribe(roomName) {
         for await (const event of response.TranscriptResultStream) {
             // console.log(event);
             const transcriptEvent = event.TranscriptEvent;
+
             if (transcriptEvent && transcriptEvent.Transcript) {
                 const results = transcriptEvent.Transcript.Results;
                 // console.log("Transcribe event results : ", results);
+                
                 results.forEach(result => {
                     if (!result.IsPartial) {
                         const transcript = result.Alternatives[0].Transcript;
@@ -126,6 +125,17 @@ async function startTranscribe(roomName) {
 }
 
 wsServer.on("connection", socket => {
+    // audio_chunk 리스너 할당
+    const handleAudioChunk = (chunk) => {
+        // 클라이언트에서 받은 오디오 데이터를 audioStream에 추가
+        // console.log("Received audio chunk size:", chunk.length); 
+        // transcribe 세션이 활성화되었을 때만 데이터 write
+        if (transcribeSessionActive)
+            audioStream.write(chunk);
+    };
+    socket.on("audio_chunk", handleAudioChunk);
+
+
     socket.on("join_room", async (roomName, email) => {
         const room = wsServer.sockets.adapter.rooms.get(roomName);
         const userCount = room ? room.size : 0;
@@ -145,19 +155,14 @@ wsServer.on("connection", socket => {
             });
 
             // 입장한 사용자의 이메일로 입장 알림을 줌
-            wsServer.to(roomName).emit("notification", `${email}님이 입장하셨습니다.`);
+            wsServer.to(roomName).emit("notification_welcome", `${email}님이 입장하셨습니다.`);
+
             // AWS Transcribe 시작
             if(userCount > 0)
-                console.log("시작");
                 startTranscribe(roomName);
         }
     });
-    socket.on("audio_chunk", (chunk) => {
-        // 클라이언트에서 받은 오디오 데이터를 audioStream에 추가
-        // console.log("Received audio chunk size:", chunk.length); 
-        audioStream.write(chunk);
-        // console.log("Chunk written to audioStream");
-    });
+
     // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
     socket.on("offer", (offer, roomName)=>{
         // console.log("roomName:", roomName, " offer : ", offer);
@@ -174,23 +179,40 @@ wsServer.on("connection", socket => {
         console.log(socket.email, "님이 방 ", roomName, "에서 나갔습니다.");
         socket.leave(roomName);
         
-
         const room = wsServer.sockets.adapter.rooms.get(roomName);
         const userCount = room ? room.size : 0;
         console.log("현재 방 ", roomName, "의 인원은 ", userCount);
-        wsServer.to(roomName).emit("notification", `${socket.email}님이 퇴장하셨습니다.`);
+        wsServer.to(roomName).emit("notification_bye", `${socket.email}님이 퇴장하셨습니다.`);
 
-        // Transcribe 종료 및 audioStream 초기화
+        // 사용자 경험 향상을 위해 setTimeout으로 통화종료 대비시키기
+        setTimeout(()=>{
+            socket.to(roomName).emit("leave_room");
+        }, 2000);
+        
+        // 먼저 audio_chunk 리스너 제거
+        socket.off("audio_chunk", handleAudioChunk);
         
         // 방에 사용자가 남아있지 않다면 AWS Transcribe 세션 종료
         if(userCount === 0 && abortController) {
             transcribeSessionActive = false;
-            abortController.abort();
-            abortController = null;
-            audioStream = new PassThrough();
-            wsServer.sockets.adapter.rooms.delete(roomName);
-            console.log("Transcribe session aborted.");
-            console.log("방 ", roomName, " 이 삭제되었습니다.")
+
+            // 트랜스크립션 스트림 종료
+            audioStream.end();
+
+            // abort를 바로 호출하지 않고, 다음 이벤트 루프에서 실행되도록 지연
+            setImmediate(() => {
+                // 세션 중단
+                abortController.abort();
+                abortController = null;
+
+                // audioStream을 새로 초기화하여 다음 세션에 준비
+                audioStream = new PassThrough();
+
+                // 해당 방 이름에 해당하는 room을 rooms 에서 명시적으로 삭제.
+                wsServer.sockets.adapter.rooms.delete(roomName);
+                console.log("Transcribe session aborted.");
+                console.log("방 ", roomName, " 이 삭제되었습니다.");
+            });
         }
     });
     socket.on("my_message", (message) => {
@@ -200,7 +222,6 @@ wsServer.on("connection", socket => {
             wsServer.to(roomName).emit("my_message", message); // 특정 방으로 전송
         } 
     });
-    
     
 });
 
