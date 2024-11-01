@@ -346,9 +346,9 @@ const chatInput = document.getElementById("chatInput");
 
 // 서버에서 새로운 메시지 수신
 // 서버에서 새로운 메시지 수신
-socket.on("remote_message", (message) => {
+socket.on("my_message", (message) => {
     const listItem = document.createElement("li");
-    listItem.classList.add("remote_message");
+    listItem.classList.add("my_message");
     const bubble = document.createElement("span");
     bubble.classList.add("message-bubble");
     bubble.innerText = message;
@@ -366,7 +366,8 @@ socket.on("peer_message", (message) => {
     logList.appendChild(listItem);
 });
 
-
+// 이미 .hidden으로 구현되어 있지만 
+// send를 보낼때마다 리셋되어 추가구현됨.
 document.addEventListener("DOMContentLoaded", () => {
     // chatForm submit 이벤트 핸들링
     chatForm.addEventListener("submit", (event) => {
@@ -375,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const message = chatInput.value.trim();
         if (message) {
             // 메시지를 서버로 전송
-            socket.emit("remote_message", message);
+            socket.emit("my_message", message);
             chatInput.value = ""; // 입력창 초기화
         }
     });

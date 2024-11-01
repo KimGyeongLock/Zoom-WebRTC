@@ -193,11 +193,11 @@ wsServer.on("connection", socket => {
             console.log("방 ", roomName, " 이 삭제되었습니다.")
         }
     });
-    socket.on("remote_message", (message) => {
+    socket.on("my_message", (message) => {
         const roomName = Array.from(socket.rooms)[1]; // 첫 번째 요소는 소켓 ID
         if (roomName) {
             console.log("Broadcasting message to room:", roomName, "Message:", message);
-            wsServer.to(roomName).emit("remote_message", message); // 특정 방으로 전송
+            wsServer.to(roomName).emit("my_message", message); // 특정 방으로 전송
         } 
     });
     
