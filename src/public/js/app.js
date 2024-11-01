@@ -341,3 +341,42 @@ function addLogMessage(message) {
 socket.on("notification", (message) => {
   alert(message);
 });
+
+const chatInput = document.getElementById("chatInput");
+
+// 서버에서 새로운 메시지 수신
+// 서버에서 새로운 메시지 수신
+socket.on("my_message", (message) => {
+    const listItem = document.createElement("li");
+    listItem.classList.add("my_message");
+    const bubble = document.createElement("span");
+    bubble.classList.add("message-bubble");
+    bubble.innerText = message;
+    listItem.appendChild(bubble);
+    logList.appendChild(listItem);
+});
+
+socket.on("your_message", (message) => {
+    const listItem = document.createElement("li");
+    listItem.classList.add("your_message");
+    const bubble = document.createElement("span");
+    bubble.classList.add("message-bubble");
+    bubble.innerText = message;
+    listItem.appendChild(bubble);
+    logList.appendChild(listItem);
+});
+
+
+document.addEventListener("DOMContentLoaded", () => {
+    // chatForm submit 이벤트 핸들링
+    chatForm.addEventListener("submit", (event) => {
+        event.preventDefault(); // 기본 제출 동작 방지
+
+        const message = chatInput.value.trim();
+        if (message) {
+            // 메시지를 서버로 전송
+            socket.emit("my_message", message);
+            chatInput.value = ""; // 입력창 초기화
+        }
+    });
+});

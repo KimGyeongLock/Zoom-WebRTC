@@ -29,11 +29,11 @@ let abortController = null;
 
 const LanguageCode = "ko-KR";
 const MediaEncoding = "pcm";
-const MediaSampleRateHertz = 16000;  // 추천되는건 16000
+const MediaSampleRateHertz = 48000;  // 추천되는건 16000
 const targetChunkSize = 16000; // 16kb target chunk size
 const chunkInterval = 500; // 0.5 seconds
 
-async function startTranscribe() {
+async function startTranscribe(roomName) {
     console.log("startTranscribe function called");
 
     abortController = new AbortController();
@@ -65,7 +65,7 @@ async function startTranscribe() {
                     const chunkToSend = buffer.subarray(0, targetChunkSize);
                     buffer = buffer.subarray(targetChunkSize); // 전송된 부분을 버퍼에서 제거
                     yield { AudioEvent: { AudioChunk: chunkToSend } };
-                    console.log("Transmitting 16KB chunk");
+                    // console.log("Transmitting 16KB chunk");
                 }
     
                 // 0.5초 대기
@@ -97,15 +97,16 @@ async function startTranscribe() {
         
         // for await...of를 사용하여 TranscriptResultStream 처리
         for await (const event of response.TranscriptResultStream) {
-            console.log(event);
+            // console.log(event);
             const transcriptEvent = event.TranscriptEvent;
             if (transcriptEvent && transcriptEvent.Transcript) {
                 const results = transcriptEvent.Transcript.Results;
-                console.log("Transcribe event results : ", results);
+                // console.log("Transcribe event results : ", results);
                 results.forEach(result => {
                     if (!result.IsPartial) {
                         const transcript = result.Alternatives[0].Transcript;
                         console.log("Final Transcript:", transcript);
+                        wsServer.to(roomName).emit("your_message", transcript);
                     }
                 });
             }
@@ -148,7 +149,7 @@ wsServer.on("connection", socket => {
             // AWS Transcribe 시작
             if(userCount > 0)
                 console.log("시작");
-                startTranscribe();
+                startTranscribe(roomName);
         }
     });
     socket.on("audio_chunk", (chunk) => {
@@ -192,6 +193,15 @@ wsServer.on("connection", socket => {
             console.log("방 ", roomName, " 이 삭제되었습니다.")
         }
     });
+    socket.on("my_message", (message) => {
+        const roomName = Array.from(socket.rooms)[1]; // 첫 번째 요소는 소켓 ID
+        if (roomName) {
+            console.log("Broadcasting message to room:", roomName, "Message:", message);
+            wsServer.to(roomName).emit("my_message", message); // 특정 방으로 전송
+        } 
+    });
+    
+    
 });
 
 const handleListen = () => console.log('Listening on http://localhost:3000');

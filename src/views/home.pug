@@ -5,12 +5,77 @@ html(lang="en")
         meta(name="viewport", content="width=device-width, initial-scale=1.0")
         title 앵무말
         link(rel="stylesheet", href="https://unpkg.com/mvp.css")
-    body 
+        style.
+            #chatBox {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                max-width: 400px;
+                margin: 0 auto;
+            }
+            
+            #logList {
+                list-style-type: none;
+                padding: 0;
+                margin: 0;
+                height: 300px;
+                overflow-y: auto;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 10px;
+            }
+
+            .my_message {
+                text-align: right;
+                margin: 5px 0;
+            }
+
+            .your_message {
+                text-align: left;
+                margin: 5px 0;
+            }
+
+            .message-bubble {
+                display: inline-block;
+                padding: 8px 12px;
+                border-radius: 15px;
+                max-width: 70%;
+                font-size: 14px;
+            }
+
+            .my_message .message-bubble {
+                background-color: #d1e7ff;
+                color: #333;
+                border-bottom-right-radius: 0;
+            }
+
+            .your_message .message-bubble {
+                background-color: #f1f1f1;
+                color: #333;
+                border-bottom-left-radius: 0;
+            }
+
+            /* Hide elements by default */
+            #call, #chatBox {
+                display: none;
+            }
+
+            /* Show elements based on selection */
+            body[data-mode="voice"] #call {
+                display: block;
+            }
+
+            body[data-mode="chat"] #call,
+            body[data-mode="chat"] #chatBox {
+                display: block;
+            }
+
+    body
         header
             h1 앵무말
         main
             div#welcome
-                form
+                form#welcomeForm
                     input#email(placeholder="Email", required, type="email")
                     input#room(placeholder="room name", required, type="text")
                     div
@@ -18,17 +83,36 @@ html(lang="en")
                         label(for="voiceOnly") Voice Only
                         input#chatAndVoice(type="radio", name="screenType", value="chat")
                         label(for="chatAndVoice") Call with Chat
-                        
                     button Enter Room
+
         div#call
             div#myStream
-            ul#logList
-            video#myFace(autoplay, playsinline, width="0", height="0")
-            button end call
+                video#myFace(autoplay, playsinline, width="0", height="0")
+                button End Call
+
         div#chatBox
             form#chatForm
+                ul#logList
                 input#chatInput(placeholder="Type a message", required, type="text")
                 button Send
-        video#peerFace(autoplay, playsinline, width="0", height="0")
+
         script(src="/socket.io/socket.io.js")
+        script.
+            // Add event listeners for radio buttons
+            const voiceOnlyRadio = document.getElementById('voiceOnly');
+            const chatAndVoiceRadio = document.getElementById('chatAndVoice');
+
+            function updateMode() {
+                if (voiceOnlyRadio.checked) {
+                    document.body.setAttribute('data-mode', 'voice');
+                } else {
+                    document.body.setAttribute('data-mode', 'chat');
+                }
+            }
+
+            voiceOnlyRadio.addEventListener('change', updateMode);
+            chatAndVoiceRadio.addEventListener('change', updateMode);
+
+            // Set initial mode
+            updateMode();
         script(src="/public/js/app.js")
