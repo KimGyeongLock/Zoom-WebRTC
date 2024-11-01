@@ -25,12 +25,12 @@ html(lang="en")
                 padding: 10px;
             }
 
-            .my_message {
+            .remote_message {
                 text-align: right;
                 margin: 5px 0;
             }
 
-            .your_message {
+            .peer_message {
                 text-align: left;
                 margin: 5px 0;
             }
@@ -43,13 +43,13 @@ html(lang="en")
                 font-size: 14px;
             }
 
-            .my_message .message-bubble {
+            .remote_message .message-bubble {
                 background-color: #d1e7ff;
                 color: #333;
                 border-bottom-right-radius: 0;
             }
 
-            .your_message .message-bubble {
+            .peer_message .message-bubble {
                 background-color: #f1f1f1;
                 color: #333;
                 border-bottom-left-radius: 0;
@@ -95,24 +95,7 @@ html(lang="en")
                 ul#logList
                 input#chatInput(placeholder="Type a message", required, type="text")
                 button Send
+            video#peerFace(autoplay, playsinline, width="0", height="0")
 
         script(src="/socket.io/socket.io.js")
-        script.
-            // Add event listeners for radio buttons
-            const voiceOnlyRadio = document.getElementById('voiceOnly');
-            const chatAndVoiceRadio = document.getElementById('chatAndVoice');
-
-            function updateMode() {
-                if (voiceOnlyRadio.checked) {
-                    document.body.setAttribute('data-mode', 'voice');
-                } else {
-                    document.body.setAttribute('data-mode', 'chat');
-                }
-            }
-
-            voiceOnlyRadio.addEventListener('change', updateMode);
-            chatAndVoiceRadio.addEventListener('change', updateMode);
-
-            // Set initial mode
-            updateMode();
         script(src="/public/js/app.js")

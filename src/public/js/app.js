@@ -346,9 +346,9 @@ const chatInput = document.getElementById("chatInput");
 
 // 서버에서 새로운 메시지 수신
 // 서버에서 새로운 메시지 수신
-socket.on("my_message", (message) => {
+socket.on("remote_message", (message) => {
     const listItem = document.createElement("li");
-    listItem.classList.add("my_message");
+    listItem.classList.add("remote_message");
     const bubble = document.createElement("span");
     bubble.classList.add("message-bubble");
     bubble.innerText = message;
@@ -356,9 +356,9 @@ socket.on("my_message", (message) => {
     logList.appendChild(listItem);
 });
 
-socket.on("your_message", (message) => {
+socket.on("peer_message", (message) => {
     const listItem = document.createElement("li");
-    listItem.classList.add("your_message");
+    listItem.classList.add("peer_message");
     const bubble = document.createElement("span");
     bubble.classList.add("message-bubble");
     bubble.innerText = message;
@@ -375,8 +375,26 @@ document.addEventListener("DOMContentLoaded", () => {
         const message = chatInput.value.trim();
         if (message) {
             // 메시지를 서버로 전송
-            socket.emit("my_message", message);
+            socket.emit("remote_message", message);
             chatInput.value = ""; // 입력창 초기화
         }
     });
 });
+
+// Add event listeners for radio buttons
+const voiceOnlyRadio = document.getElementById('voiceOnly');
+const chatAndVoiceRadio = document.getElementById('chatAndVoice');
+
+function updateMode() {
+    if (voiceOnlyRadio.checked) {
+        document.body.setAttribute('data-mode', 'voice');
+    } else {
+        document.body.setAttribute('data-mode', 'chat');
+    }
+}
+
+voiceOnlyRadio.addEventListener('change', updateMode);
+chatAndVoiceRadio.addEventListener('change', updateMode);
+
+// Set initial mode
+updateMode();
