@@ -263,7 +263,12 @@ async function handleAddStream(data) {
 
     // handleWelcomeSubmit에서 설정된 roomName은 전역변수라서 
     // handleAddStream에서도 접근할 수 있음.
-    socket.emit("audio_chunk", audioChunk, roomName);
+    // socket.emit("audio_chunk", audioChunk, roomName);
+    
+    // "With Chat" 모드일 경우에만 audio_chunk 전송
+    if (document.body.getAttribute('data-mode') === 'chat') {
+      socket.emit("audio_chunk", audioChunk, roomName);
+  }
   };
 
   source.connect(processor);
