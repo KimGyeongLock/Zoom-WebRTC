@@ -23,7 +23,7 @@ const wsServer = SocketIO(httpServer);
 // 오디오 데이터를 받을 스트림
 let audioStream = new PassThrough();
 
-// let transcribeSessionActive = false;
+let transcribeSessionActive = false;
 // let abortController = null;
 
 // 각 방의 PassThrough 스트림과 AbortControl는
@@ -40,7 +40,7 @@ const chunkInterval = 500; // 0.5 seconds
 async function startTranscribe(roomName) {
     // roomName 명시적 타입 검사
     if (typeof roomName !== "string") {
-        console.error("Invalid roomName:", roomName);
+        console.log("roomname type not right : startTranscribe");
         return;
     }
 
@@ -48,6 +48,7 @@ async function startTranscribe(roomName) {
 
     abortControllers[roomName] = new AbortController();
     const audioStream = roomAudioStreams[roomName];
+
     const client = new TranscribeStreamingClient({
         region: process.env.AWS_REGION,
         credentials: {
@@ -68,7 +69,7 @@ async function startTranscribe(roomName) {
             for await (const chunk of audioStream) {
                 // console.log("Processing audio chunk in AudioStream");
 
-                if (!transcribeSessionActive) break;  // 세션 비활성화 시 루프 종료
+                // if (!transcribeSessionActive) break;  // 세션 비활성화 시 루프 종료
                 buffer = Buffer.concat([buffer, chunk]);
     
                 // 0.5초마다 버퍼를 확인하고 16KB 청크로 나누어 전송
@@ -100,7 +101,7 @@ async function startTranscribe(roomName) {
             command,
             {   
                 // AbortController 연결
-                signal: abortController.signal
+                signal: abortControllers[roomName].signal
             } 
         );
         
@@ -132,7 +133,7 @@ async function startTranscribe(roomName) {
     }
     finally {
         // 트랜스크립션 종료 시 세션 비활성화
-        // transcribeSessionActive = false;
+        transcribeSessionActive = false;
         delete roomAudioStreams[roomName];
         delete abortControllers[roomName];
     }
@@ -143,7 +144,6 @@ wsServer.on("connection", socket => {
     const handleAudioChunk = (chunk, roomName) => {
         // roomName 타입 검사
         if(typeof roomName !== "string"){
-            console.error("Invalid roomName:", roomName);
             return;
         }
 
@@ -217,8 +217,8 @@ wsServer.on("connection", socket => {
         socket.off("audio_chunk", handleAudioChunk);
         
         // 방에 사용자가 남아있지 않다면 AWS Transcribe 세션 종료
-        if(userCount === 0 && abortController) {
-            // transcribeSessionActive = false;
+        if(userCount === 0 && roomAudioStreams[roomName]) {
+            //transcribeSessionActive = false;
 
             // 트랜스크립션 스트림 종료
             // audioStream.end();
@@ -235,8 +235,9 @@ wsServer.on("connection", socket => {
 
                 if(abortControllers[roomName]){
                     abortControllers[roomName].abort();
+                    delete abortControllers[roomName];
                 }
-
+                delete roomAudioStreams[roomName];
                 // 해당 방 이름에 해당하는 room을 rooms 에서 명시적으로 삭제.
                 wsServer.sockets.adapter.rooms.delete(roomName);
                 console.log("Transcribe session aborted.");
