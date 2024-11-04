@@ -112,12 +112,16 @@ welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 /////////////////////////// Socket code /////////////////////////////
 
 // caller쪽에서 실행되는 것
+// 두명이 다 도착해야 실행
 socket.on("welcome", async () => {
   // DataChannel은 Offer을 생성해주기 전에 만들어야 함
   myDataChannel = myPeerConnection.createDataChannel("chat");
   // 관련 이벤트 리스너 등록해주기
   myDataChannel.addEventListener("message", (msg) => {
-    console.log(msg.data.toString());
+    console.log("Received from peer:", msg.data);
+    // 내가 방을 만든 경우 상대방이 방에 들어오는 경우, 나는 콜포비아(채팅러), 상대방(보이스)
+    displayPeerMessage(msg.data);
+    // 이거 잘 나옴
   });
 
   // caller가 SDP를 생성함(offer)
@@ -127,6 +131,13 @@ socket.on("welcome", async () => {
   console.log("caller : sent to : ", roomName);
   // 어느 방에 전송할지, 그 방의 누구에게 전송할 지
   socket.emit("offer", offer, roomName);
+});
+
+// 서버에서 전송된 transcript 결과를 받아 DataChannel을 통해 상대방에게 전송
+socket.on("transcript", (transcript) => {
+  if (myDataChannel && myDataChannel.readyState === "open") {
+    myDataChannel.send(transcript);
+  }
 });
 
 // callee가 caller가 프론트에서 offer로 보낸 sdp가
@@ -144,6 +155,7 @@ socket.on("welcome", async () => {
 // getUserMedia랑 addStream(addTrack)은 makeConnection에서 이미
 // 방에 입장할때 해 주었으므로 따로 하지 않음.
 
+
 // callee 쪽에서 실행되는 것
 socket.on("offer", async (offer) => {
   // offer를 받는 callee는 만들어진 datachannel를 받아서 사용하고
@@ -151,7 +163,9 @@ socket.on("offer", async (offer) => {
   myPeerConnection.addEventListener("datachannel", (e) => {
     myDataChannel = e.channel;
     myDataChannel.addEventListener("message", (msg) => {
-      console.log(msg.data.toString());
+      console.log("Received from caller:", msg.data);
+      // 상대방이 방을 만든 경우 내가 방에 들어오는 경우, 나는 콜포비아(채팅러), 상대방(보이스)
+      displayPeerMessage(msg.data);
     });
   });
 
@@ -319,28 +333,6 @@ socket.on("notification_bye", (message) => {
 
 const chatInput = document.getElementById("chatInput");
 
-// 서버에서 새로운 메시지 수신
-// 서버에서 새로운 메시지 수신
-socket.on("my_message", (message) => {
-    const listItem = document.createElement("li");
-    listItem.classList.add("my_message");
-    const bubble = document.createElement("span");
-    bubble.classList.add("message-bubble");
-    bubble.innerText = message;
-    listItem.appendChild(bubble);
-    logList.appendChild(listItem);
-});
-
-socket.on("peer_message", (message) => {
-    const listItem = document.createElement("li");
-    listItem.classList.add("peer_message");
-    const bubble = document.createElement("span");
-    bubble.classList.add("message-bubble");
-    bubble.innerText = message;
-    listItem.appendChild(bubble);
-    logList.appendChild(listItem);
-});
-
 // 이미 .hidden으로 구현되어 있지만 
 // send를 보낼때마다 리셋되어 추가구현됨.
 document.addEventListener("DOMContentLoaded", () => {
@@ -351,11 +343,44 @@ document.addEventListener("DOMContentLoaded", () => {
       const message = chatInput.value.trim();
       if (message) {
           // 메시지를 서버로 전송
-          socket.emit("my_message", message);
+          sendMessage(message);
           chatInput.value = ""; // 입력창 초기화
       }
   });
 });
+
+function sendMessage(message) {
+  // DataChannel이 열려 있는지 확인하고 메시지 전송
+  if (myDataChannel && myDataChannel.readyState === "open") {
+    myDataChannel.send(message);
+    displayMyMessage(message);  // 내 메시지를 화면에 표시하는 함수 호출
+  } else {
+    console.warn("DataChannel is not open. Message not sent.");
+  }
+}
+
+// 내 메시지를 화면에 표시하는 함수
+function displayMyMessage(message) {
+  const listItem = document.createElement("li");
+  listItem.classList.add("my_message");
+  const bubble = document.createElement("span");
+  bubble.classList.add("message-bubble");
+  bubble.innerText = message;
+  listItem.appendChild(bubble);
+  logList.appendChild(listItem);
+}
+
+// 상대의 메시지를 화면에 표시하는 함수
+function displayPeerMessage(message) {
+  const listItem = document.createElement("li");
+  listItem.classList.add("peer_message");
+  const bubble = document.createElement("span");
+  bubble.classList.add("message-bubble");
+  bubble.innerText = message;
+  listItem.appendChild(bubble);
+  logList.appendChild(listItem);
+}
+
 
 // Add event listeners for radio buttons
 const voiceOnlyRadio = document.getElementById('voiceOnly');

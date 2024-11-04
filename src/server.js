@@ -117,8 +117,8 @@ async function startTranscribe(roomName) {
                 results.forEach(result => {
                     if (!result.IsPartial) {
                         const transcript = result.Alternatives[0].Transcript;
-                        console.log(`Final Transcript from room ${roomName}:`, transcript);
-                        wsServer.to(roomName).emit("peer_message", transcript);
+                        // console.log(`Final Transcript from room ${roomName}:`, transcript);
+                        wsServer.to(roomName).emit("transcript", transcript); 
                     }
                 });
             }
