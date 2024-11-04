@@ -35,7 +35,7 @@ async function getMedia(deviceId) {
     audio: {
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: false,
+      autoGainControl: true,
     },
     video: false,
   };
@@ -89,16 +89,19 @@ async function handleWelcomeSubmit(e) {
   ).value;
 
   // 방과 이메일을 함께 서버에 전송
-  socket.emit("join_room", room, email);
+  // screenType도 같이 보내서 with Chat일때만 실행
+  socket.emit("join_room", room, email, screenType);
   roomName = room;
   roomInput.value = "";
   emailInput.value = "";
 
   // 화면 종류에 따라 다른 화면 보여주기
-  if (screenType == "voice") {
+  if (screenType === "voice") {
+    console.log("checked voice");
     call.hidden = false;
     chatBox.hidden = true;
-  } else if (screenType == "chat") {
+  } else if (screenType === "chat") {
+    console.log("checked with chat");
     call.hidden = false;
     chatBox.hidden = false;
   }
@@ -258,7 +261,9 @@ async function handleAddStream(data) {
     //     console.log("Downsampled to 16000Hz");
     // }
 
-    socket.emit("audio_chunk", audioChunk);
+    // handleWelcomeSubmit에서 설정된 roomName은 전역변수라서 
+    // handleAddStream에서도 접근할 수 있음.
+    socket.emit("audio_chunk", audioChunk, roomName);
   };
 
   source.connect(processor);
@@ -339,17 +344,17 @@ socket.on("peer_message", (message) => {
 // 이미 .hidden으로 구현되어 있지만 
 // send를 보낼때마다 리셋되어 추가구현됨.
 document.addEventListener("DOMContentLoaded", () => {
-    // chatForm submit 이벤트 핸들링
-    chatForm.addEventListener("submit", (event) => {
-        event.preventDefault(); // 기본 제출 동작 방지
+  // chatForm submit 이벤트 핸들링
+  chatForm.addEventListener("submit", (event) => {
+      event.preventDefault(); // 기본 제출 동작 방지
 
-        const message = chatInput.value.trim();
-        if (message) {
-            // 메시지를 서버로 전송
-            socket.emit("my_message", message);
-            chatInput.value = ""; // 입력창 초기화
-        }
-    });
+      const message = chatInput.value.trim();
+      if (message) {
+          // 메시지를 서버로 전송
+          socket.emit("my_message", message);
+          chatInput.value = ""; // 입력창 초기화
+      }
+  });
 });
 
 // Add event listeners for radio buttons
