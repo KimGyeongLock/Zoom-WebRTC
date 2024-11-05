@@ -35,8 +35,8 @@ let abortControllers = {};
 const LanguageCode = "ko-KR";
 const MediaEncoding = "pcm";
 const MediaSampleRateHertz = 48000;  // 추천되는건 16000
-const targetChunkSize = 32000; // 16kb target chunk size
-const chunkInterval = 500; // 0.5 seconds
+const targetChunkSize = 4096; // 4kb target chunk size
+const chunkInterval = 125; // 0.125 seconds
 
 async function startTranscribe(roomName) {
     // roomName 명시적 타입 검사
