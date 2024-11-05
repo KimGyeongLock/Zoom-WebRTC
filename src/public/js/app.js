@@ -193,9 +193,17 @@ function makeConnection() {
         urls: [
           "stun:stun.l.google.com:19302",
           "stun:stun1.l.google.com:19302",
-          "stun:stun2.l.google.com:19302",
         ],
       },
+      // TURN 서버
+      {
+          urls: [
+              "turn:turn-test.ptks.link", // 기본 포트
+              "turn:turn-test.ptks.link:3478" // 명시적 포트
+          ],
+          username: "ptk",
+          credential: "pass123"
+      }
     ],
   });
   // peerConnection을 만든 직후 Ice Candidate를 생성해야 함
