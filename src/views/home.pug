@@ -70,6 +70,29 @@ html(lang="en")
                 display: block;
             }
 
+            #recommendations button {
+                width: 100%; /* 채팅방 가로 크기 */
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis; /* 버튼이 짧을 때 말줄임 */
+                display: inline-block;
+                position: relative;
+            }
+
+            #recommendations button span {
+                display: inline-block;
+                animation: scroll-text 10s linear infinite;
+            }
+
+            @keyframes scroll-text {
+                0% {
+                    transform: translateX(100%);
+                }
+                100% {
+                    transform: translateX(-100%);
+                }
+            }
+
     body
         header
             h1 앵무말
@@ -93,6 +116,7 @@ html(lang="en")
         div#chatBox
             form#chatForm
                 ul#logList
+                div#recommendations
                 input#chatInput(placeholder="Type a message", required, type="text")
                 button Send
             video#peerFace(autoplay, playsinline, width="0", height="0")
