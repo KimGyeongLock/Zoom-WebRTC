@@ -121,7 +121,6 @@ socket.on("welcome", async () => {
     console.log("Received from peer:", msg.data);
     // 내가 방을 만든 경우 상대방이 방에 들어오는 경우, 나는 콜포비아(채팅러), 상대방(보이스)
     displayPeerMessage(msg.data);
-    // 이거 잘 나옴
   });
 
   // caller가 SDP를 생성함(offer)
