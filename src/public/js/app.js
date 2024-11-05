@@ -120,7 +120,8 @@ socket.on("welcome", async () => {
   myDataChannel.addEventListener("message", (msg) => {
     console.log("Received from peer:", msg.data);
     // 내가 방을 만든 경우 상대방이 방에 들어오는 경우, 나는 콜포비아(채팅러), 상대방(보이스)
-    displayPeerMessage(msg.data);
+    // displayPeerMessage(msg.data);
+    socket.emit("request_tts", msg.data, roomName);
   });
 
   // caller가 SDP를 생성함(offer)
@@ -135,7 +136,8 @@ socket.on("welcome", async () => {
 // 서버에서 전송된 transcript 결과를 받아 DataChannel을 통해 상대방에게 전송
 socket.on("transcript", (transcript) => {
   if (myDataChannel && myDataChannel.readyState === "open") {
-    myDataChannel.send(transcript);
+    // myDataChannel.send(transcript);
+    displayPeerMessage(transcript);
   }
 });
 
@@ -161,11 +163,20 @@ socket.on("offer", async (offer) => {
   // 거기다가 이벤트 리스너만 달면 된다.
   myPeerConnection.addEventListener("datachannel", (e) => {
     myDataChannel = e.channel;
-    myDataChannel.addEventListener("message", (msg) => {
+    myDataChannel.addEventListener("message", async (msg) => {
       console.log("Received from caller:", msg.data);
-      // 상대방이 방을 만든 경우 내가 방에 들어오는 경우, 나는 콜포비아(채팅러), 상대방(보이스)
-      displayPeerMessage(msg.data);
+    
+      // #myStream에 메시지 표시
+      // const myStreamDiv = document.querySelector("#myStream");
+      // const messageElement = document.createElement("div");
+      // messageElement.classList.add("peer_message", "message-bubble");
+      // messageElement.innerText = msg.data;
+      // myStreamDiv.appendChild(messageElement);
+    
+      // 서버에 TTS 요청
+      socket.emit("request_tts", msg.data, roomName);
     });
+    
   });
 
   console.log("callee : offer received : ", offer);
@@ -403,3 +414,51 @@ chatAndVoiceRadio.addEventListener('change', updateMode);
 
 // Set initial mode
 updateMode();
+
+
+/////tts 코드//////
+
+// 오디오 재생 함수 수정
+socket.on("tts_response", async (audioBase64) => {
+  try {
+    // Base64 디코딩
+    const audioData = atob(audioBase64);
+    const arrayBuffer = new ArrayBuffer(audioData.length);
+    const view = new Uint8Array(arrayBuffer);
+
+    for (let i = 0; i < audioData.length; i++) {
+      view[i] = audioData.charCodeAt(i);
+    }
+
+    // AudioContext 사용
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const decodedData = await audioContext.decodeAudioData(arrayBuffer);
+
+    // 오디오 소스 생성
+    const source = audioContext.createBufferSource();
+    source.buffer = decodedData;
+
+    // 자동 재생 시도
+    const playAudio = async () => {
+      try {
+        
+        source.connect(audioContext.destination);
+        source.start(0);  // 재생 시작
+        
+      } catch (error) {
+        console.error("오디오 재생 오류:", error);
+      }
+    };
+
+    await playAudio();
+
+    // 재생 완료 후 메모리 정리
+    source.onended = () => {
+      source.disconnect();
+      audioContext.close();
+    };
+
+  } catch (error) {
+    console.error("오디오 처리 에러:", error);
+  }
+});

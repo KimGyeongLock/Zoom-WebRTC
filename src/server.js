@@ -4,10 +4,24 @@ import SocketIO from "socket.io";
 import dotenv from 'dotenv';
 import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from "@aws-sdk/client-transcribe-streaming";
 import { PassThrough } from "stream";
+import axios from "axios";
+import AWS from 'aws-sdk'; // AWS SDK 추가
+
 
 // dotenv import하고 서버 초기화 전에 .config() 실행해야
 // 환경변수 읽을 수 있음
 dotenv.config();
+
+// AWS Polly 자격 증명 설정
+AWS.config.update({
+    region: process.env.AWS_REGION, // 서울 리전 예시
+    accessKeyId: process.env.AWS_ACCESS_ID,  // 환경 변수 사용 권장
+    secretAccessKey: process.env.AWS_SECRET_ID,
+});
+
+// Polly 클라이언트 생성
+const polly = new AWS.Polly();
+
 const app = express();
 
 app.set('view engine', "pug");
@@ -117,8 +131,26 @@ async function startTranscribe(roomName) {
                 results.forEach(result => {
                     if (!result.IsPartial) {
                         const transcript = result.Alternatives[0].Transcript;
-                        // console.log(`Final Transcript from room ${roomName}:`, transcript);
-                        wsServer.to(roomName).emit("transcript", transcript); 
+
+                        // 추천 문장 요청
+                        axios.post('http://52.79.189.35:8000/recommendations', {
+                            room_number: roomName,
+                            sentence: transcript
+                        })
+                        .then(response => {
+                            const recommendations = response.data.recommendations;
+                            wsServer.to(roomName).emit("recommendations", recommendations);
+                        })
+                        .catch(error => {
+                            if (error.code === 'ECONNREFUSED') {
+                                console.error('Connection refused. Please check the server status.');
+                            } else {
+                                console.error('An unexpected error occurred:', error.message);
+                            }
+                        })
+
+                        console.log(`Final Transcript from room ${roomName}:`, transcript);
+                        wsServer.to(roomName).emit("transcript", transcript);
                     }
                 });
             }
@@ -218,21 +250,12 @@ wsServer.on("connection", socket => {
         
         // 방에 사용자가 남아있지 않다면 AWS Transcribe 세션 종료
         if(userCount === 0 && roomAudioStreams[roomName]) {
-            //transcribeSessionActive = false;
-
             // 트랜스크립션 스트림 종료
-            // audioStream.end();
             roomAudioStreams[roomName].end();
 
             // abort를 바로 호출하지 않고, 다음 이벤트 루프에서 실행되도록 지연
             setImmediate(() => {
                 // 세션 중단
-                // abortController.abort();
-                // abortController = null;
-
-                // audioStream을 새로 초기화하여 다음 세션에 준비
-                // audioStream = new PassThrough();
-
                 if(abortControllers[roomName]){
                     abortControllers[roomName].abort();
                     delete abortControllers[roomName];
@@ -245,15 +268,39 @@ wsServer.on("connection", socket => {
             });
         }
     });
-    socket.on("my_message", (message) => {
-        const roomName = Array.from(socket.rooms)[1]; // 첫 번째 요소는 소켓 ID
-        if (roomName) {
-            console.log("Broadcasting message to room:", roomName, "Message:", message);
-            wsServer.to(roomName).emit("my_message", message); // 특정 방으로 전송
-        } 
-    });
-    
+    // socket.on("my_message", (message) => {
+    //     const roomName = Array.from(socket.rooms)[1]; // 첫 번째 요소는 소켓 ID
+    //     if (roomName) {
+    //         console.log("Broadcasting message to room:", roomName, "Message:", message);
+    //         wsServer.to(roomName).emit("my_message", message); // 특정 방으로 전송
+    //     } 
+    // });
+    socket.on("request_tts", async (text, roomName) => {
+        try {
+            const params = {
+            Text: text,
+            OutputFormat: "mp3",
+            VoiceId: "Seoyeon"  // 한국어 음성
+        };
+        const data = await polly.synthesizeSpeech(params).promise();
+
+          // AudioStream을 Base64로 인코딩하여 클라이언트에 전송
+        if (data.AudioStream) {
+            const audioBase64 = data.AudioStream.toString('base64');
+            socket.emit("tts_response", audioBase64);
+        } else {
+            console.error("AudioStream이 비어 있습니다.");
+        }
+          
+        } catch (error) {
+          console.error("Polly TTS 에러:", error);
+          socket.emit("tts_error", error.message);
+        }
+      });
 });
 
 const handleListen = () => console.log('Listening on http://localhost:3000');
 httpServer.listen(3000, handleListen);
+
+
+
