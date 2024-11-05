@@ -4,6 +4,7 @@ import SocketIO from "socket.io";
 import dotenv from 'dotenv';
 import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from "@aws-sdk/client-transcribe-streaming";
 import { PassThrough } from "stream";
+import axios from "axios";
 
 // dotenv import하고 서버 초기화 전에 .config() 실행해야
 // 환경변수 읽을 수 있음
@@ -117,8 +118,25 @@ async function startTranscribe(roomName) {
                 results.forEach(result => {
                     if (!result.IsPartial) {
                         const transcript = result.Alternatives[0].Transcript;
-                        // console.log(`Final Transcript from room ${roomName}:`, transcript);
-                        wsServer.to(roomName).emit("transcript", transcript); 
+                        // 추천 문장 요청
+                        axios.post('http://52.79.189.35:8000/recommendations', {
+                            room_number: roomName,
+                            sentence: transcript
+                        })
+                        .then(response => {
+                            const recommendations = response.data.recommendations;
+                            wsServer.to(roomName).emit("recommendations", recommendations);
+                        })
+                        .catch(error => {
+                            if (error.code === 'ECONNREFUSED') {
+                                console.error('Connection refused. Please check the server status.');
+                            } else {
+                                console.error('An unexpected error occurred:', error.message);
+                            }
+                        })
+
+                        console.log(`Final Transcript from room ${roomName}:`, transcript);
+                        wsServer.to(roomName).emit("transcript", transcript);
                     }
                 });
             }
@@ -218,21 +236,12 @@ wsServer.on("connection", socket => {
         
         // 방에 사용자가 남아있지 않다면 AWS Transcribe 세션 종료
         if(userCount === 0 && roomAudioStreams[roomName]) {
-            //transcribeSessionActive = false;
-
             // 트랜스크립션 스트림 종료
-            // audioStream.end();
             roomAudioStreams[roomName].end();
 
             // abort를 바로 호출하지 않고, 다음 이벤트 루프에서 실행되도록 지연
             setImmediate(() => {
                 // 세션 중단
-                // abortController.abort();
-                // abortController = null;
-
-                // audioStream을 새로 초기화하여 다음 세션에 준비
-                // audioStream = new PassThrough();
-
                 if(abortControllers[roomName]){
                     abortControllers[roomName].abort();
                     delete abortControllers[roomName];

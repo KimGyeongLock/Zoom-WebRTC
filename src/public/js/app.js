@@ -404,3 +404,21 @@ chatAndVoiceRadio.addEventListener('change', updateMode);
 
 // Set initial mode
 updateMode();
+
+// 추천 문장 이벤트 리스너 추가
+socket.on("recommendations", (recommendations) => {
+  const recommendationsContainer = document.getElementById("recommendations");
+  recommendationsContainer.innerHTML = "";
+
+  if(recommendations.length === 3){
+    recommendations.forEach(recommendation => {
+      const button = document.createElement("button");
+      const span = document.createElement("span");
+      button.innerText = recommendation;
+      button.addEventListener("click", () => {
+        chatInput.value = recommendation;
+      });
+      recommendationsContainer.appendChild(button);
+    });
+  }
+});
