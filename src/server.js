@@ -268,13 +268,6 @@ wsServer.on("connection", socket => {
             });
         }
     });
-    // socket.on("my_message", (message) => {
-    //     const roomName = Array.from(socket.rooms)[1]; // 첫 번째 요소는 소켓 ID
-    //     if (roomName) {
-    //         console.log("Broadcasting message to room:", roomName, "Message:", message);
-    //         wsServer.to(roomName).emit("my_message", message); // 특정 방으로 전송
-    //     } 
-    // });
     socket.on("request_tts", async (text, roomName) => {
         try {
             const params = {

@@ -120,7 +120,6 @@ socket.on("welcome", async () => {
   myDataChannel.addEventListener("message", (msg) => {
     console.log("Received from peer:", msg.data);
     // 내가 방을 만든 경우 상대방이 방에 들어오는 경우, 나는 콜포비아(채팅러), 상대방(보이스)
-    // displayPeerMessage(msg.data);
     socket.emit("request_tts", msg.data, roomName);
   });
 
@@ -135,10 +134,7 @@ socket.on("welcome", async () => {
 
 // 서버에서 전송된 transcript 결과를 받아 DataChannel을 통해 상대방에게 전송
 socket.on("transcript", (transcript) => {
-  if (myDataChannel && myDataChannel.readyState === "open") {
-    // myDataChannel.send(transcript);
-    displayPeerMessage(transcript);
-  }
+  displayMessage(transcript, "peer_message");  // 내 메시지를 화면에 표시하는 함수 호출
 });
 
 // callee가 caller가 프론트에서 offer로 보낸 sdp가
@@ -217,9 +213,17 @@ function makeConnection() {
         urls: [
           "stun:stun.l.google.com:19302",
           "stun:stun1.l.google.com:19302",
-          "stun:stun2.l.google.com:19302",
-        ],
+        ]
       },
+      // TURN 서버
+      {
+          urls: [
+              "turn:turn-test.ptks.link", // 기본 포트
+              "turn:turn-test.ptks.link:3478" // 명시적 포트
+          ],
+          username: "ptk",
+          credential: "pass123"
+      }
     ],
   });
   // peerConnection을 만든 직후 Ice Candidate를 생성해야 함
@@ -357,7 +361,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const message = chatInput.value.trim();
       if (message) {
-          // 메시지를 서버로 전송
+          // 메시지를 Data Channel로 전송
           sendMessage(message);
           chatInput.value = ""; // 입력창 초기화
       }
@@ -368,34 +372,22 @@ function sendMessage(message) {
   // DataChannel이 열려 있는지 확인하고 메시지 전송
   if (myDataChannel && myDataChannel.readyState === "open") {
     myDataChannel.send(message);
-    displayMyMessage(message);  // 내 메시지를 화면에 표시하는 함수 호출
+    displayMessage(message, "my_message");  // 내 메시지를 화면에 표시하는 함수 호출
   } else {
     console.warn("DataChannel is not open. Message not sent.");
   }
 }
 
 // 내 메시지를 화면에 표시하는 함수
-function displayMyMessage(message) {
+function displayMessage(contents, messageType) {
   const listItem = document.createElement("li");
-  listItem.classList.add("my_message");
+  listItem.classList.add(messageType);
   const bubble = document.createElement("span");
   bubble.classList.add("message-bubble");
-  bubble.innerText = message;
+  bubble.innerText = contents;
   listItem.appendChild(bubble);
   logList.appendChild(listItem);
 }
-
-// 상대의 메시지를 화면에 표시하는 함수
-function displayPeerMessage(message) {
-  const listItem = document.createElement("li");
-  listItem.classList.add("peer_message");
-  const bubble = document.createElement("span");
-  bubble.classList.add("message-bubble");
-  bubble.innerText = message;
-  listItem.appendChild(bubble);
-  logList.appendChild(listItem);
-}
-
 
 // Add event listeners for radio buttons
 const voiceOnlyRadio = document.getElementById('voiceOnly');
@@ -418,20 +410,14 @@ updateMode();
 
 /////tts 코드//////
 
-// 오디오 재생 함수 수정
 socket.on("tts_response", async (audioBase64) => {
   try {
-    // Base64 디코딩
+    // Base64 디코딩 후 ArrayBuffer로 변환
     const audioData = atob(audioBase64);
-    const arrayBuffer = new ArrayBuffer(audioData.length);
-    const view = new Uint8Array(arrayBuffer);
-
-    for (let i = 0; i < audioData.length; i++) {
-      view[i] = audioData.charCodeAt(i);
-    }
+    const arrayBuffer = new Uint8Array(audioData.length).map((_, i) => audioData.charCodeAt(i)).buffer;
 
     // AudioContext 사용
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const audioContext = new window.AudioContext();
     const decodedData = await audioContext.decodeAudioData(arrayBuffer);
 
     // 오디오 소스 생성
@@ -441,10 +427,8 @@ socket.on("tts_response", async (audioBase64) => {
     // 자동 재생 시도
     const playAudio = async () => {
       try {
-        
         source.connect(audioContext.destination);
         source.start(0);  // 재생 시작
-        
       } catch (error) {
         console.error("오디오 재생 오류:", error);
       }
