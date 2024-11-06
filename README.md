@@ -1,3 +1,3 @@
-# Noom
+# ParroTalk - WebRTC
 
-Zoom Clone using WebRTC and Websockets.
+앵무말 통화 파트 테스트용
