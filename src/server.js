@@ -133,7 +133,7 @@ async function startTranscribe(roomName) {
                         const transcript = result.Alternatives[0].Transcript;
 
                         // 추천 문장 요청
-                        axios.post('http://52.79.189.35:8000/recommendations', {
+                        axios.post(process.env.AI_RECOMMENDATIONS, {
                             room_number: roomName,
                             sentence: transcript
                         })
