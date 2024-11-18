@@ -92,6 +92,7 @@ async function handleWelcomeSubmit(e) {
   // screenType도 같이 보내서 with Chat일때만 실행
   socket.emit("join_room", room, email, screenType);
   roomName = room;
+
   roomInput.value = "";
   emailInput.value = "";
 
@@ -257,9 +258,6 @@ function handleIce(data) {
   console.log("sent ice candidate ");
 }
 
-let chatLogs = [];
-let mediaRecorder;
-
 // ICE 후보들까지 교환하고 나서 peer(상대)의 stream을 등록
 async function handleAddStream(data) {
   const peerFace = document.getElementById("peerFace");
@@ -296,47 +294,16 @@ async function handleAddStream(data) {
     // handleAddStream에서도 접근할 수 있음.
     // socket.emit("audio_chunk", audioChunk, roomName);
     
-    // MediaRecorder 설정
-    const audioChunks = [];
-    mediaRecorder = new MediaRecorder(data.stream, { mimeType: "audio/webm" });
-
-    mediaRecorder.ondataavailable = (event) => {
-      audioChunks.push(event.data);
-    };
-
-    mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-      await sendAudioAndChatToServer(audioBlob, chatLogs); // 음성 + 채팅 데이터 전송
-    };
-
-    mediaRecorder.start();
-
 
     // "With Chat" 모드일 경우에만 audio_chunk 전송
     if (document.body.getAttribute('data-mode') === 'chat') {
       socket.emit("audio_chunk", audioChunk, roomName);
-  }
+    }
   };
 
   source.connect(processor);
 }
 
-async function sendAudioAndChatToServer(audioBlob, chatLogs) {
-  const formData = new FormData();
-  formData.append("audio", audioBlob);
-  formData.append("chatLogs", JSON.stringify(chatLogs)); // JSON 형태로 채팅 로그 추가
-
-  try {
-    const response = await fetch("/process-data", {
-      method: "POST",
-      body: formData,
-    });
-    const result = await response.json();
-    console.log("JSON 결과:", result);
-  } catch (error) {
-    console.error("데이터 처리 중 오류:", error);
-  }
-}
 
 // 한명이 나가면 다른 한쪽도 자동으로 나가게끔 함
 // leave_room 이벤트 수신 시 handleEndCall 실행
@@ -355,11 +322,6 @@ function handleEndCall() {
   call.hidden = true;
   chatBox.hidden = true;
   welcome.hidden = false;
-
-  // MediaRecorder가 활성 상태라면 녹음을 중지
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
-  }
 
   if (myStream) {
     myStream.getTracks().forEach((track) => track.stop());
@@ -404,6 +366,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (message) {
           // 메시지를 Data Channel로 전송
           sendMessage(message);
+          socket.emit("chat_message", { roomName, message });
+
           chatInput.value = ""; // 입력창 초기화
       }
   });
@@ -412,14 +376,13 @@ document.addEventListener("DOMContentLoaded", () => {
 function sendMessage(message) {
   // DataChannel이 열려 있는지 확인하고 메시지 전송
   if (myDataChannel && myDataChannel.readyState === "open") {
-    const timestamp = new Date().toISOString(); // 타임스탬프 추가
-    chatLogs.push({ timestamp, message, sender: "me" }); // 채팅 데이터를 기록
     myDataChannel.send(message);
     displayMessage(message, "my_message");  // 내 메시지를 화면에 표시하는 함수 호출
   } else {
     console.warn("DataChannel is not open. Message not sent.");
   }
 }
+
 
 // 내 메시지를 화면에 표시하는 함수
 function displayMessage(contents, messageType) {
@@ -506,4 +469,24 @@ socket.on("recommendations", (recommendations) => {
       recommendationsContainer.appendChild(button);
     });
   }
+});
+
+socket.on("ai_summary", ({ summary, todo }) => {
+  console.log(summary);
+   // 요약 데이터 표시
+   const summaryContainer = document.getElementById("summary-container");
+   summaryContainer.innerHTML = `<h3>요약</h3><p>${summary}</p>`;
+
+   // 할 일 데이터 표시
+   const todoContainer = document.getElementById("todo-container");
+   todoContainer.innerHTML = "<h3>할 일 목록</h3>";
+   const todoList = document.createElement("ul");
+
+   todo.forEach(item => {
+       const listItem = document.createElement("li");
+       listItem.textContent = item;
+       todoList.appendChild(listItem);
+   });
+
+   todoContainer.appendChild(todoList);
 });

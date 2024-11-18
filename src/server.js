@@ -150,6 +150,7 @@ async function startTranscribe(roomName) {
                         })
 
                         console.log(`Final Transcript from room ${roomName}:`, transcript);
+                        content += transcript;
                         wsServer.to(roomName).emit("transcript", transcript);
                     }
                 });
@@ -170,6 +171,8 @@ async function startTranscribe(roomName) {
         delete abortControllers[roomName];
     }
 }
+
+let content = "";
 
 wsServer.on("connection", socket => {
     // audio_chunk 리스너 할당
@@ -193,9 +196,9 @@ wsServer.on("connection", socket => {
         const userCount = room ? room.size : 0;
 
         // 2명 이상이면 room_full event 발생시킴
-        if(userCount >= 2)
+        if(userCount >= 2) {
             socket.emit("room_full");
-        else {
+        } else {
             socket.join(roomName);
             console.log(`${email} joined room: ${roomName} as ${screenType}`);
             // 이메일을 소켓 객체에 저장
@@ -210,6 +213,7 @@ wsServer.on("connection", socket => {
             wsServer.to(roomName).emit("notification_welcome", `${email}님이 입장하셨습니다.`);
 
             console.log("방 ", roomName,"의 현재 인원 : ", userCount);
+            
             // AWS Transcribe 시작
             // 채팅일때만 시작
             if(!roomAudioStreams[roomName] && screenType === "chat"){
@@ -218,6 +222,29 @@ wsServer.on("connection", socket => {
             }
         }
     });
+
+    function logMessageLogsToConsole(roomName) {
+        // 요약 요청
+        axios.post(process.env.AI_SUMMARY, {
+            room_number: roomName,
+            sentence: content
+        })
+        .then(response => {
+            console.log(response);
+            // summary와 todo 데이터를 클라이언트에 보냄
+            const { summary, todo } = response.data;
+       
+            //DB 저장
+            // wsServer.to(roomName).emit("ai_summary", { summary, todo });
+        })
+        .catch(error => {
+            if (error.code === 'ECONNREFUSED') {
+                console.error('SUMMARY : Connection refused. Please check the server status.');
+            } else {
+                console.error('SUMMARY : An unexpected error occurred:', error.message);
+            }
+        })
+    }
 
     // caller가 offer로 보낸 sdp를 통화를 연결하려는 방에 보냄
     socket.on("offer", (offer, roomName)=>{
@@ -250,6 +277,13 @@ wsServer.on("connection", socket => {
         
         // 방에 사용자가 남아있지 않다면 AWS Transcribe 세션 종료
         if(userCount === 0 && roomAudioStreams[roomName]) {
+
+            // JSON으로 메시지 로그 출력
+            logMessageLogsToConsole(roomName);
+    
+            // messageLogs 초기화
+            content = "";
+
             // 트랜스크립션 스트림 종료
             roomAudioStreams[roomName].end();
 
@@ -290,76 +324,11 @@ wsServer.on("connection", socket => {
           socket.emit("tts_error", error.message);
         }
       });
+
+    socket.on("chat_message", ({ roomName, message }) => {
+        content += message;
+    });
 });
-
-
-const multer = require("multer");
-const fs = require("fs");
-const upload = multer({ storage: multer.memoryStorage() });
-
-app.post("/process-data", upload.single("audio"), async (req, res) => {
-    const audioBuffer = req.file.buffer;
-    const chatLogs = JSON.parse(req.body.chatLogs); // 채팅 데이터 수신
-    const timestamp = new Date().toISOString();
-
-    try {
-        // 음성 데이터 STT 처리
-        const transcript = await transcribeAudio(audioBuffer);
-
-        // JSON 데이터 구조화
-        const result = {
-        timestamp,
-        transcript, // 음성 데이터 변환 결과
-        chatLogs,   // 채팅 데이터
-        };
-
-        // JSON 파일로 저장
-        const resultFileName = `results/${Date.now()}_session.json`;
-        fs.writeFileSync(resultFileName, JSON.stringify(result, null, 2));
-
-        res.status(200).json({ message: "데이터 처리 성공", result });
-    } catch (error) {
-        console.error("데이터 처리 오류:", error);
-        res.status(500).json({ error: "데이터 처리 중 오류 발생" });
-    }
-});
-
-async function transcribeAudio(audioBuffer) {
-    const client = new TranscribeStreamingClient({ region: "ap-northeast-2" });
-    const audioStream = new PassThrough();
-    audioStream.end(audioBuffer);
-  
-    const params = {
-      LanguageCode: "ko-KR",
-      MediaEncoding: "webm",
-      MediaSampleRateHertz: 16000,
-      AudioStream: (async function* () {
-        yield { AudioEvent: { AudioChunk: audioStream.read() } };
-      })(),
-    };
-  
-    const command = new StartStreamTranscriptionCommand(params);
-  
-    try {
-      const response = await client.send(command);
-      const transcriptChunks = [];
-  
-      for await (const event of response.TranscriptResultStream) {
-        const results = event.TranscriptEvent.Transcript.Results;
-        results.forEach((result) => {
-          if (!result.IsPartial) {
-            transcriptChunks.push(result.Alternatives[0].Transcript);
-          }
-        });
-      }
-  
-      return transcriptChunks.join(" ");
-    } catch (error) {
-      console.error("STT 처리 오류:", error);
-      throw error;
-    }
-  }
-
 
 
 const handleListen = () => console.log('Listening on http://localhost:3000');
