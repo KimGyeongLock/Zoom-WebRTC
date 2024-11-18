@@ -292,6 +292,76 @@ wsServer.on("connection", socket => {
       });
 });
 
+
+const multer = require("multer");
+const fs = require("fs");
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post("/process-data", upload.single("audio"), async (req, res) => {
+    const audioBuffer = req.file.buffer;
+    const chatLogs = JSON.parse(req.body.chatLogs); // 채팅 데이터 수신
+    const timestamp = new Date().toISOString();
+
+    try {
+        // 음성 데이터 STT 처리
+        const transcript = await transcribeAudio(audioBuffer);
+
+        // JSON 데이터 구조화
+        const result = {
+        timestamp,
+        transcript, // 음성 데이터 변환 결과
+        chatLogs,   // 채팅 데이터
+        };
+
+        // JSON 파일로 저장
+        const resultFileName = `results/${Date.now()}_session.json`;
+        fs.writeFileSync(resultFileName, JSON.stringify(result, null, 2));
+
+        res.status(200).json({ message: "데이터 처리 성공", result });
+    } catch (error) {
+        console.error("데이터 처리 오류:", error);
+        res.status(500).json({ error: "데이터 처리 중 오류 발생" });
+    }
+});
+
+async function transcribeAudio(audioBuffer) {
+    const client = new TranscribeStreamingClient({ region: "ap-northeast-2" });
+    const audioStream = new PassThrough();
+    audioStream.end(audioBuffer);
+  
+    const params = {
+      LanguageCode: "ko-KR",
+      MediaEncoding: "webm",
+      MediaSampleRateHertz: 16000,
+      AudioStream: (async function* () {
+        yield { AudioEvent: { AudioChunk: audioStream.read() } };
+      })(),
+    };
+  
+    const command = new StartStreamTranscriptionCommand(params);
+  
+    try {
+      const response = await client.send(command);
+      const transcriptChunks = [];
+  
+      for await (const event of response.TranscriptResultStream) {
+        const results = event.TranscriptEvent.Transcript.Results;
+        results.forEach((result) => {
+          if (!result.IsPartial) {
+            transcriptChunks.push(result.Alternatives[0].Transcript);
+          }
+        });
+      }
+  
+      return transcriptChunks.join(" ");
+    } catch (error) {
+      console.error("STT 처리 오류:", error);
+      throw error;
+    }
+  }
+
+
+
 const handleListen = () => console.log('Listening on http://localhost:3000');
 httpServer.listen(3000, handleListen);
 
